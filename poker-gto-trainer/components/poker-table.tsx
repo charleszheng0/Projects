@@ -5,7 +5,7 @@ import { PokerCard } from "./poker-card";
 import { Badge } from "./ui/badge";
 
 export function PokerTable() {
-  const { playerHand, numPlayers, playerPosition, playerStackBB, playerStacksBB, pot, bigBlind } = useGameStore();
+  const { playerHand, numPlayers, playerPosition, playerStackBB, playerStacksBB, pot, bigBlind, gameStage, communityCards } = useGameStore();
 
   // Create array of player positions around the table
   const playerPositions = Array.from({ length: numPlayers }, (_, i) => i);
@@ -25,6 +25,15 @@ export function PokerTable() {
             <div className="text-yellow-200 text-xl font-bold">{pot} BB</div>
           </div>
 
+          {/* Community Cards */}
+          {communityCards.length > 0 && (
+            <div className="flex gap-2">
+              {communityCards.map((card, index) => (
+                <PokerCard key={index} card={card} size="md" />
+              ))}
+            </div>
+          )}
+
           {/* Player hand display */}
           {playerHand && (
             <div className="flex gap-2">
@@ -33,10 +42,15 @@ export function PokerTable() {
             </div>
           )}
 
-          {/* Position badge */}
-          <Badge variant="secondary" className="bg-gray-800 text-white">
-            Position: {playerPosition}
-          </Badge>
+          {/* Position and Stage badge */}
+          <div className="flex gap-2 flex-wrap justify-center">
+            <Badge variant="secondary" className="bg-gray-800 text-white">
+              Position: {playerPosition}
+            </Badge>
+            <Badge variant="secondary" className="bg-blue-800 text-white capitalize">
+              {gameStage}
+            </Badge>
+          </div>
         </div>
 
         {/* Player positions around the table */}

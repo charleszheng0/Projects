@@ -3,11 +3,7 @@ pid: 33864
 cwd: |
   C:\Users\User\.cursor\Projects\poker-gto-trainer
 active_command: npm run dev
-last_command: |
-  cd C:\Users\User\.cursor\Projects\poker-gto-trainer
-  Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force
-  Remove-Item .next -Recurse -Force -ErrorAction SilentlyContinue
-  npm run dev
+last_command: npm run dev
 last_exit_code: 1
 ---
 PS C:\Users\User\.cursor\Projects> cd C:\Users\User\.cursor\Projects\poker-gto-trainer
@@ -42,3 +38,82 @@ PS C:\Users\User\.cursor\Projects\poker-gto-trainer>
 ✓ Ready in 1210ms
  GET / 200 in 625ms (compile: 438ms, render: 187ms)
  GET /game 200 in 72ms (compile: 50ms, render: 22ms)
+PS C:\Users\User\.cursor\Projects\poker-gto-trainer> 
+                                                     @table_example1.png is the clubgg poker style that you should draw inspiration from. 
+>> git config --global user.name "czheng"   
+At line:1 char:21
++ @table_example1.png is the clubgg poker style that you should draw in ...
++                     ~~
+Unexpected token 'is' in expression or statement.
+At line:1 char:1
++ @table_example1.png is the clubgg poker style that you should draw in ...
++ ~~~~~~~~~~~~~~~
+The splatting operator '@' cannot be used to reference variables in an expression. '@table_example1' can be used only as an argument to a command. To reference variables in an expression use   
+'$table_example1'.
+    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException
+    + FullyQualifiedErrorId : UnexpectedToken
+
+PS C:\Users\User\.cursor\Projects\poker-gto-trainer> git config --global user.name czheng     
+PS C:\Users\User\.cursor\Projects\poker-gto-trainer> git config --global user.email czheng276@gmail.com     
+PS C:\Users\User\.cursor\Projects\poker-gto-trainer> npm run dev
+
+> poker-gto-trainer@0.1.0 dev
+> cross-env NEXT_TELEMETRY_DISABLED=1 next dev
+
+▲ Next.js 16.1.1 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.22:3000
+- Environments: .env.local
+
+✓ Starting...
+✓ Ready in 1289ms
+ GET / 200 in 697ms (compile: 423ms, render: 274ms)
+ GET /game 200 in 87ms (compile: 65ms, render: 22ms)
+PS C:\Users\User\.cursor\Projects\poker-gto-trainer> 
+                                                     npm run dev
+
+> poker-gto-trainer@0.1.0 dev
+> cross-env NEXT_TELEMETRY_DISABLED=1 next dev
+
+▲ Next.js 16.1.1 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.22:3000
+- Environments: .env.local
+
+✓ Starting...
+✓ Ready in 1222ms
+ GET / 200 in 616ms (compile: 375ms, render: 242ms)
+ GET /game 200 in 123ms (compile: 72ms, render: 50ms)
+ GET / 200 in 74ms (compile: 9ms, render: 66ms)
+ GET /game 200 in 138ms (compile: 96ms, render: 42ms)
+ GET / 200 in 73ms (compile: 11ms, render: 62ms)
+ GET /game 200 in 117ms (compile: 98ms, render: 20ms)
+✓ Compiled in 60ms
+✓ Compiled in 44ms
+✓ Compiled in 44ms
+✓ Compiled in 117ms
+✓ Compiled in 38ms
+ GET /game 200 in 210ms (compile: 76ms, render: 135ms)
+ GET / 200 in 103ms (compile: 14ms, render: 89ms)
+✓ Compiled in 43ms
+PS C:\Users\User\.cursor\Projects\poker-gto-trainer> 
+                                                     npm run dev
+
+> poker-gto-trainer@0.1.0 dev
+> cross-env NEXT_TELEMETRY_DISABLED=1 next dev
+
+▲ Next.js 16.1.1 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.22:3000
+- Environments: .env.local
+
+✓ Starting...
+✓ Ready in 1228ms
+ GET / 200 in 593ms (compile: 395ms, render: 198ms)
+ GET /game 200 in 105ms (compile: 76ms, render: 29ms)
+ GET / 200 in 192ms (compile: 21ms, render: 170ms)
+ GET /game 200 in 133ms (compile: 98ms, render: 35ms)
+ GET / 200 in 81ms (compile: 15ms, render: 65ms)
+ GET /game 200 in 123ms (compile: 80ms, render: 43ms)
+ GET / 200 in 107ms (compile: 6ms, render: 100ms)
+ GET /game 200 in 123ms (compile: 96ms, render: 26ms)

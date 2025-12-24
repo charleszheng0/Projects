@@ -23,7 +23,8 @@ export interface BetSizeAnalysis {
 export function analyzeBetSize(
   hand: Hand,
   position: Position,
-  betSizeBB: number
+  betSizeBB: number,
+  numPlayers?: number
 ): BetSizeAnalysis {
   const handString = formatHand(hand);
   const rank1 = hand.card1.rank;
@@ -41,6 +42,12 @@ export function analyzeBetSize(
   const isPremiumAce = isAce && highRankValue >= rankOrder.indexOf("K");
   const isPremiumHand = isPremiumPair || isPremiumAce;
 
+  // Table size adjustments
+  const tableSize = numPlayers || 6;
+  const isHeadsUp = tableSize === 2;
+  const isShortHanded = tableSize <= 4;
+  const isFullRing = tableSize >= 7;
+
   // Position-based optimal sizing
   const isEarlyPosition = ["UTG", "UTG+1"].includes(position);
   const isLatePosition = ["CO", "BTN"].includes(position);
@@ -54,27 +61,27 @@ export function analyzeBetSize(
     // Premium hands: 3-4 BB for maximum value
     optimalSize = 3;
     sizeRange = { min: 3, max: 4 };
-    reasoning = `Premium hands (${handString}) should be raised larger (3-4 BB) to maximize value and build the pot. In ${position}, a 3-4 BB raise extracts maximum value from weaker hands while still allowing you to fold if facing a 3-bet from an even stronger hand.`;
+    reasoning = `Premium hands (${handString}) should be raised larger (3-4 BB) to maximize value and build the pot. In ${position} at a ${tableSize}-handed table, a 3-4 BB raise extracts maximum value from weaker hands while still allowing you to fold if facing a 3-bet from an even stronger hand.`;
   } else if (isEarlyPosition) {
     // Early position: 2.5-3 BB (standard, value-focused)
     optimalSize = 2.5;
     sizeRange = { min: 2.5, max: 3 };
-    reasoning = `In early position (${position}), a standard raise size of 2.5-3 BB is optimal. This size builds the pot with your value hands while keeping the pot controlled if you need to fold to a 3-bet. Going larger risks building too large a pot out of position.`;
+    reasoning = `In early position (${position}) at a ${tableSize}-handed table, a standard raise size of 2.5-3 BB is optimal. This size builds the pot with your value hands while keeping the pot controlled if you need to fold to a 3-bet. Going larger risks building too large a pot out of position.`;
   } else if (isLatePosition) {
     // Late position: 2-3 BB (can go smaller for steals)
     optimalSize = 2.5;
     sizeRange = { min: 2, max: 3 };
-    reasoning = `In late position (${position}), you can use a slightly wider range of bet sizes (2-3 BB). A 2.5-3 BB raise is standard for value hands, while 2-2.5 BB can be used for lighter raises/steals. Your position advantage allows for more flexibility.`;
+    reasoning = `In late position (${position}) at a ${tableSize}-handed table, you can use a slightly wider range of bet sizes (2-3 BB). A 2.5-3 BB raise is standard for value hands, while 2-2.5 BB can be used for lighter raises/steals. Your position advantage allows for more flexibility. ${isHeadsUp ? "Heads-up, you can be even more aggressive." : ""}`;
   } else if (isBlind) {
     // Blinds: 2.5-3 BB (standard)
     optimalSize = 2.5;
     sizeRange = { min: 2.5, max: 3 };
-    reasoning = `From the blinds (${position}), a standard raise size of 2.5-3 BB is optimal. This size works well for both value hands and lighter raises, balancing pot building with pot control.`;
+    reasoning = `From the blinds (${position}) at a ${tableSize}-handed table, a standard raise size of 2.5-3 BB is optimal. This size works well for both value hands and lighter raises, balancing pot building with pot control.`;
   } else {
     // Middle position: 2.5-3 BB (standard)
     optimalSize = 2.5;
     sizeRange = { min: 2.5, max: 3 };
-    reasoning = `In middle position (${position}), a standard raise size of 2.5-3 BB is optimal. This size builds the pot appropriately while maintaining flexibility.`;
+    reasoning = `In middle position (${position}) at a ${tableSize}-handed table, a standard raise size of 2.5-3 BB is optimal. This size builds the pot appropriately while maintaining flexibility.`;
   }
 
   // Check if bet size is optimal

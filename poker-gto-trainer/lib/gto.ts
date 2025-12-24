@@ -1,4 +1,5 @@
 import gtoRanges from "./gto-ranges.json";
+import { getAdjustedGTOAction } from "./gto-table-size";
 
 export type Card = {
   rank: string;
@@ -50,11 +51,18 @@ export function formatHand(hand: Hand): string {
 export function getGTOAction(
   hand: Hand,
   position: Position,
-  actionTaken: Action
+  actionTaken: Action,
+  numPlayers?: number
 ): { correct: boolean; optimalActions: Action[]; feedback: string } {
   const handString = formatHand(hand);
-  const positionRanges = gtoRanges[position as keyof typeof gtoRanges] as Record<string, string>;
   
+  // Use table-size-adjusted ranges if numPlayers is provided
+  if (numPlayers !== undefined) {
+    return getAdjustedGTOAction(hand, position, numPlayers, actionTaken);
+  }
+  
+  // Fallback to base ranges
+  const positionRanges = gtoRanges[position as keyof typeof gtoRanges] as Record<string, string>;
   const optimalAction = positionRanges[handString] as Action | undefined;
 
   if (!optimalAction) {

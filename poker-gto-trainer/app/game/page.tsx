@@ -7,6 +7,7 @@ import { ActionButtons } from "@/components/action-buttons";
 import { FeedbackBox } from "@/components/feedback-box";
 import { FeedbackModal } from "@/components/feedback-modal";
 import { BetSizingModal } from "@/components/bet-sizing-modal";
+import { PlayerCountSelector } from "@/components/player-count-selector";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
@@ -27,6 +28,25 @@ export default function GamePage() {
           <h1 className="text-4xl font-bold text-white mb-2">Poker GTO Trainer</h1>
           <p className="text-gray-400">Practice Game Theory Optimal preflop decisions</p>
         </div>
+
+        {/* Player Count Selector */}
+        <div className="mb-6 flex justify-center">
+          <PlayerCountSelector />
+        </div>
+
+        {/* Deal Next Hand Button */}
+        {playerHand && (
+          <div className="mb-4 flex justify-center">
+            <Button
+              onClick={dealNewHand}
+              variant="outline"
+              size="lg"
+              className="bg-gray-800 hover:bg-gray-700 text-white border-gray-600 px-8"
+            >
+              Deal Next Hand
+            </Button>
+          </div>
+        )}
 
         {/* Game Area */}
         <div className="space-y-8">
