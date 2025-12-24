@@ -1,0 +1,44 @@
+---
+pid: 33864
+cwd: |
+  C:\Users\User\.cursor\Projects\poker-gto-trainer
+active_command: npm run dev
+last_command: |
+  cd C:\Users\User\.cursor\Projects\poker-gto-trainer
+  Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force
+  Remove-Item .next -Recurse -Force -ErrorAction SilentlyContinue
+  npm run dev
+last_exit_code: 1
+---
+PS C:\Users\User\.cursor\Projects> cd C:\Users\User\.cursor\Projects\poker-gto-trainer
+>> Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force
+>> Remove-Item .next -Recurse -Force -ErrorAction SilentlyContinue
+>> npm run dev
+
+> poker-gto-trainer@0.1.0 dev
+> cross-env NEXT_TELEMETRY_DISABLED=1 next dev
+
+▲ Next.js 16.1.1 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.22:3000
+- Environments: .env.local
+
+✓ Starting...
+✓ Ready in 1189ms
+ GET / 200 in 2.4s (compile: 2.3s, render: 186ms)
+ GET /game 200 in 495ms (compile: 463ms, render: 32ms)
+PS C:\Users\User\.cursor\Projects\poker-gto-trainer> 
+                                                     npm run dev
+
+> poker-gto-trainer@0.1.0 dev
+> cross-env NEXT_TELEMETRY_DISABLED=1 next dev
+
+▲ Next.js 16.1.1 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.22:3000
+- Environments: .env.local
+
+✓ Starting...
+✓ Ready in 1210ms
+ GET / 200 in 625ms (compile: 438ms, render: 187ms)
+ GET /game 200 in 72ms (compile: 50ms, render: 22ms)
