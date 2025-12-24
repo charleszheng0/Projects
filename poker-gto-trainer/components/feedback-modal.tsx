@@ -23,11 +23,21 @@ export function FeedbackModal() {
     postFlopBetSizeAnalysis,
   } = useGameStore();
 
-  if (!showFeedbackModal || (!explanation && !postFlopExplanation)) {
+  // Only show modal if we have an explanation for the current stage
+  const isPreflop = gameStage === "preflop";
+  const hasCurrentExplanation = isPreflop ? explanation : postFlopExplanation;
+  
+  // Always show modal if showFeedbackModal is true, even if explanation is null
+  // (this prevents modal from disappearing if game stage changes)
+  if (!showFeedbackModal) {
     return null;
   }
   
-  const isPreflop = gameStage === "preflop";
+  // If we don't have an explanation yet, show a loading state or wait
+  if (!hasCurrentExplanation) {
+    return null;
+  }
+  
   const currentExplanation = isPreflop ? explanation : postFlopExplanation;
 
   const actionLabels: Record<string, string> = {
@@ -42,7 +52,7 @@ export function FeedbackModal() {
   return (
     <div 
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
-      onClick={closeFeedbackModal}
+      // Don't close on backdrop click - require explicit close button
     >
       <div 
         className="w-full max-w-4xl p-4 pb-8 animate-in slide-in-from-bottom duration-300"
@@ -120,8 +130,8 @@ export function FeedbackModal() {
               </>
             )}
 
-            {/* Bet Sizing Analysis */}
-            {(betSizeAnalysis || postFlopBetSizeAnalysis) && betSizeBB && (
+            {/* Bet Sizing Analysis - Only show if action was bet/raise AND action was correct */}
+            {isCorrect && ((betSizeAnalysis && (lastAction === "raise")) || (postFlopBetSizeAnalysis && (lastAction === "bet" || lastAction === "raise"))) && betSizeBB && (
               <div className="space-y-2">
                 <h3 className="text-lg font-semibold text-white">Bet Sizing Analysis:</h3>
                 {betSizeAnalysis ? (
@@ -187,7 +197,10 @@ export function FeedbackModal() {
             {/* Action Buttons */}
             <div className="flex gap-4 pt-4">
               <Button
-                onClick={closeFeedbackModal}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeFeedbackModal();
+                }}
                 variant="default"
                 size="lg"
                 className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"

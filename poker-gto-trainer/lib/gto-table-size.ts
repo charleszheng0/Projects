@@ -38,31 +38,58 @@ export function getAdjustedGTOAction(
   const isMidHanded = numPlayers >= 5 && numPlayers <= 6;
   const isFullRing = numPlayers >= 7;
 
-  // Adjust action based on table size
+  // Determine position category
+  const isEarlyPosition = ["UTG", "UTG+1"].includes(position);
+  const isMiddlePosition = position === "MP";
+  const isLatePosition = ["CO", "BTN"].includes(position);
+  const isBlind = ["SB", "BB"].includes(position);
+
+  // Adjust action based on table size AND position
+  // Position is PRIMARY factor - late position allows more aggressive play
   let optimalAction: Action | undefined = baseAction;
 
   // If hand is not in base range, check if it becomes playable with fewer players
+  // BUT respect position - late position can play more hands
   if (!baseAction || baseAction === "fold") {
-    // For heads-up and short-handed, many more hands become playable
+    // For heads-up, position matters less
     if (isHeadsUp) {
       // Heads-up: Very wide ranges
       optimalAction = getHeadsUpAction(handString, isPair, isSuited, isAce, highRankValue, lowRankValue, rankOrder);
     } else if (isShortHanded) {
-      // Short-handed (3-4 players): Wider ranges
-      optimalAction = getShortHandedAction(handString, isPair, isSuited, isAce, highRankValue, lowRankValue, rankOrder, position);
+      // Short-handed (3-4 players): Wider ranges, but position still matters
+      optimalAction = getShortHandedAction(handString, isPair, isSuited, isAce, highRankValue, lowRankValue, rankOrder, position, isEarlyPosition, isLatePosition);
     } else if (isMidHanded) {
-      // Mid-handed (5-6 players): Slightly wider than full ring
-      optimalAction = getMidHandedAction(handString, isPair, isSuited, isAce, highRankValue, lowRankValue, rankOrder, position);
+      // Mid-handed (5-6 players): Slightly wider than full ring, position matters
+      optimalAction = getMidHandedAction(handString, isPair, isSuited, isAce, highRankValue, lowRankValue, rankOrder, position, isEarlyPosition, isLatePosition);
     } else {
-      // Full ring (7-9 players): Use base ranges (tightest)
-      optimalAction = baseAction;
+      // Full ring (7-9 players): Use base ranges (tightest), but late position can still widen slightly
+      if (isLatePosition && !baseAction) {
+        // In late position at full ring, some marginal hands become playable
+        optimalAction = getLatePositionFullRingAction(handString, isPair, isSuited, isAce, highRankValue, lowRankValue, rankOrder);
+      } else {
+        optimalAction = baseAction;
+      }
     }
   } else {
-    // Hand is already in range - might become more aggressive with fewer players
+    // Hand is already in range - might become more aggressive with fewer players OR in late position
     if (isHeadsUp && (optimalAction === "call" || optimalAction === "fold")) {
       // In heads-up, many calling hands become raises
       if (isPair || isAce || highRankValue >= rankOrder.indexOf("K")) {
         optimalAction = "raise";
+      }
+    } else if (isLatePosition && optimalAction === "call" && (isPair || isAce || highRankValue >= rankOrder.indexOf("J"))) {
+      // In late position, some calling hands can become raises
+      if (isPair && highRankValue >= rankOrder.indexOf("7")) {
+        optimalAction = "raise";
+      } else if (isAce && highRankValue >= rankOrder.indexOf("T")) {
+        optimalAction = "raise";
+      } else if (highRankValue >= rankOrder.indexOf("K")) {
+        optimalAction = "raise";
+      }
+    } else if (isEarlyPosition && optimalAction === "raise" && !isPair && !isAce && highRankValue < rankOrder.indexOf("K")) {
+      // In early position, some weaker raising hands should just call or fold
+      if (highRankValue < rankOrder.indexOf("Q")) {
+        optimalAction = "call";
       }
     }
   }
@@ -142,36 +169,66 @@ function getShortHandedAction(
   highRankValue: number,
   lowRankValue: number,
   rankOrder: string[],
-  position: Position
+  position: Position,
+  isEarlyPosition: boolean,
+  isLatePosition: boolean
 ): Action {
-  // Short-handed (3-4 players): Wider ranges than full ring
+  // Short-handed (3-4 players): Wider ranges than full ring, but position still matters
   if (isPair) {
     if (highRankValue >= rankOrder.indexOf("7")) {
-      return "raise";
+      return isLatePosition ? "raise" : (isEarlyPosition ? "call" : "raise");
     }
-    return "call";
+    return isLatePosition ? "call" : "fold";
   }
   if (isAce) {
     if (highRankValue >= rankOrder.indexOf("Q")) {
-      return "raise";
+      return isLatePosition ? "raise" : (isEarlyPosition ? "raise" : "raise");
+    }
+    if (highRankValue >= rankOrder.indexOf("T")) {
+      // AT-AK
+      if (isLatePosition) {
+        return isSuited ? "raise" : "call";
+      } else if (isEarlyPosition) {
+        return isSuited ? "call" : "fold";
+      } else {
+        return isSuited ? "raise" : "call";
+      }
     }
     if (highRankValue >= rankOrder.indexOf("7")) {
-      return isSuited ? "raise" : "call";
+      // A7-A9
+      if (isLatePosition) {
+        return isSuited ? "raise" : "call";
+      } else if (isEarlyPosition) {
+        return isSuited ? "call" : "fold";
+      } else {
+        return isSuited ? "call" : "fold";
+      }
     }
-    // Weak aces (A2-A6) become playable short-handed
+    // Weak aces (A2-A6) become playable short-handed, but mainly in late position
     if (highRankValue >= rankOrder.indexOf("5")) {
-      return isSuited ? "call" : "fold";
+      if (isLatePosition) {
+        return isSuited ? "call" : "fold";
+      } else {
+        return "fold";
+      }
     }
     return "fold";
   }
   if (isSuited && highRankValue >= rankOrder.indexOf("8")) {
-    return "call";
+    return isLatePosition ? "call" : (isEarlyPosition ? "fold" : "call");
   }
   if (highRankValue >= rankOrder.indexOf("K")) {
-    return "call";
+    // K-high hands
+    if (isLatePosition) {
+      return "call";
+    } else if (isEarlyPosition) {
+      return "fold";
+    } else {
+      return "call";
+    }
   }
   if (highRankValue >= rankOrder.indexOf("Q") && lowRankValue >= rankOrder.indexOf("9")) {
-    return "call";
+    return isLatePosition ? "call" : "fold";
   }
   return "fold";
 }
@@ -184,32 +241,86 @@ function getMidHandedAction(
   highRankValue: number,
   lowRankValue: number,
   rankOrder: string[],
-  position: Position
+  position: Position,
+  isEarlyPosition: boolean,
+  isLatePosition: boolean
 ): Action {
-  // Mid-handed (5-6 players): Slightly wider than full ring
+  // Mid-handed (5-6 players): Slightly wider than full ring, position matters significantly
   if (isPair) {
     if (highRankValue >= rankOrder.indexOf("7")) {
-      return "raise";
+      return isLatePosition ? "raise" : (isEarlyPosition ? "raise" : "raise");
     }
-    return "call";
+    return isLatePosition ? "call" : (isEarlyPosition ? "fold" : "call");
   }
   if (isAce) {
     if (highRankValue >= rankOrder.indexOf("Q")) {
-      return "raise";
+      return isLatePosition ? "raise" : (isEarlyPosition ? "raise" : "raise");
+    }
+    if (highRankValue >= rankOrder.indexOf("T")) {
+      // AT-AK
+      if (isLatePosition) {
+        return isSuited ? "raise" : "call";
+      } else if (isEarlyPosition) {
+        return isSuited ? "call" : "fold";
+      } else {
+        return isSuited ? "raise" : "call";
+      }
     }
     if (highRankValue >= rankOrder.indexOf("8")) {
-      return isSuited ? "raise" : "call";
+      // A8-A9
+      if (isLatePosition) {
+        return isSuited ? "raise" : "call";
+      } else if (isEarlyPosition) {
+        return "fold";
+      } else {
+        return isSuited ? "call" : "fold";
+      }
     }
-    // A7-A9 become playable mid-handed
+    // A7 becomes playable mid-handed, but mainly in late position
+    if (highRankValue >= rankOrder.indexOf("7")) {
+      if (isLatePosition) {
+        return isSuited ? "call" : "fold";
+      } else {
+        return "fold";
+      }
+    }
+    return "fold";
+  }
+  if (isSuited && highRankValue >= rankOrder.indexOf("9")) {
+    return isLatePosition ? "call" : (isEarlyPosition ? "fold" : "call");
+  }
+  if (highRankValue >= rankOrder.indexOf("K")) {
+    return isLatePosition ? "call" : (isEarlyPosition ? "fold" : "call");
+  }
+  return "fold";
+}
+
+function getLatePositionFullRingAction(
+  handString: string,
+  isPair: boolean,
+  isSuited: boolean,
+  isAce: boolean,
+  highRankValue: number,
+  lowRankValue: number,
+  rankOrder: string[]
+): Action {
+  // Late position at full ring: Some marginal hands become playable
+  if (isPair) {
+    if (highRankValue >= rankOrder.indexOf("6")) {
+      return "call";
+    }
+    return "fold";
+  }
+  if (isAce) {
+    if (highRankValue >= rankOrder.indexOf("T")) {
+      return isSuited ? "call" : "fold";
+    }
     if (highRankValue >= rankOrder.indexOf("7")) {
       return isSuited ? "call" : "fold";
     }
     return "fold";
   }
-  if (isSuited && highRankValue >= rankOrder.indexOf("9")) {
-    return "call";
-  }
-  if (highRankValue >= rankOrder.indexOf("K")) {
+  if (isSuited && highRankValue >= rankOrder.indexOf("T")) {
     return "call";
   }
   return "fold";

@@ -58,6 +58,15 @@ export function getGTOExplanation(
   const isMiddlePosition = position === "MP";
   const isLatePosition = ["CO", "BTN"].includes(position);
   const isBlind = ["SB", "BB"].includes(position);
+  
+  // Position-specific context for explanations
+  const positionContext = isEarlyPosition 
+    ? "Early position (UTG/UTG+1) requires tighter ranges because many players act after you, increasing the chance someone has a stronger hand."
+    : isLatePosition
+    ? "Late position (CO/BTN) allows wider ranges because you act last, giving you more information and control over the pot."
+    : isMiddlePosition
+    ? "Middle position requires moderate ranges - tighter than late position but looser than early position."
+    : "Blind positions have already invested chips, which improves pot odds but limits positional advantage.";
 
   // Use the optimalActions passed in (from getGTOAction)
   const correctActions = optimalActions;
@@ -87,47 +96,47 @@ export function getGTOExplanation(
       } else if (wasAllIn && isAce && highRankValue >= rankOrder.indexOf("K")) {
         explanation = `${handString} is a premium ace hand.`;
         reasoning = `AK is one of the strongest non-pair hands preflop. It has high card value, pairs well, and can dominate weaker ace hands. Raising aggressively (or going all-in) maximizes value and puts maximum pressure on opponents. In ${position}, this aggressive play is optimal because you're likely ahead or have good equity even when behind.`;
-      } else if (optimalAction === "raise") {
-        if (becamePlayable && isAce && highRankValue < rankOrder.indexOf("Q")) {
-          // Weak aces that became playable due to table size
-          explanation = `${handString} becomes playable at a ${tableSize}-handed table.`;
-          if (isHeadsUp) {
-            reasoning = `Heads-up, almost any ace is playable. ${handString} has decent high card value and can dominate weaker hands. Raising builds the pot and puts pressure on your opponent. With only one opponent, the risk of being dominated is much lower.`;
-          } else if (isShortHanded) {
-            reasoning = `At a short-handed table (${tableSize} players), weaker aces like ${handString} become playable. With fewer opponents, the chance of someone having a stronger ace is reduced. ${isSuited ? "Being suited adds flush potential, making this hand even more valuable." : "Raising builds the pot and can get value from weaker hands."}`;
+        } else if (optimalAction === "raise") {
+          if (becamePlayable && isAce && highRankValue < rankOrder.indexOf("Q")) {
+            // Weak aces that became playable due to table size or position
+            explanation = `${handString} becomes playable ${isLatePosition ? "from late position" : `at a ${tableSize}-handed table`}.`;
+            if (isHeadsUp) {
+              reasoning = `Heads-up, almost any ace is playable. ${handString} has decent high card value and can dominate weaker hands. Raising builds the pot and puts pressure on your opponent. With only one opponent, the risk of being dominated is much lower.`;
+            } else if (isShortHanded) {
+              reasoning = `At a short-handed table (${tableSize} players), weaker aces like ${handString} become playable. ${isLatePosition ? "In late position, you can raise because you act last and have more control." : isEarlyPosition ? "However, from early position, this hand is still marginal and should fold." : ""} With fewer opponents, the chance of someone having a stronger ace is reduced. ${isSuited ? "Being suited adds flush potential, making this hand even more valuable." : "Raising builds the pot and can get value from weaker hands."}`;
+            } else {
+              reasoning = `${isLatePosition ? "In late position, " : ""}At a ${tableSize}-handed table, ${handString} is ${isLatePosition ? "playable because you act last and can control the pot." : "on the edge of playability."} ${isSuited ? "Being suited gives you flush potential, making it worth raising." : "Raising can work, but you need to be cautious of stronger hands."} ${positionContext}`;
+            }
+          } else if (isPair && highRankValue >= rankOrder.indexOf("7") && highRankValue < rankOrder.indexOf("T")) {
+            explanation = `${handString} is a medium pair.`;
+            reasoning = `Medium pairs (77-99) have decent equity but are vulnerable to overcards. At a ${tableSize}-handed table, raising builds the pot when ahead and can force folds from weaker hands. ${isLatePosition ? "In late position, raising is optimal because you can control the pot and have position post-flop." : isEarlyPosition ? "In early position, raising is still correct for value, but you need to be cautious of stronger hands behind you." : "Raising is preferred over calling because it builds value and gives you initiative."} ${correctActions.includes("call") ? "However, calling can also be acceptable to control pot size." : ""}`;
+          } else if (isAce && highRankValue >= rankOrder.indexOf("Q")) {
+            if (isSuited) {
+              explanation = `${handString} is a strong ace-suited hand.`;
+              reasoning = `AQs has excellent high card value and flush potential. At a ${tableSize}-handed table, raising builds the pot and can get value from weaker hands. ${isLatePosition ? "In late position, raising is optimal because you have position and can control the pot post-flop." : isEarlyPosition ? "In early position, raising is correct for value, but you need to be prepared to fold if facing strong resistance." : "Raising is optimal because you have a strong hand that plays well post-flop and can dominate weaker ace hands."}`;
+            } else {
+              explanation = `${handString} is a strong ace offsuit hand.`;
+              reasoning = `AQo has good high card value but is vulnerable to AK and pairs. ${isLatePosition ? "In late position, raising is optimal because you can control the pot and have position." : isEarlyPosition ? "In early position, raising is more marginal - you're building the pot but vulnerable to stronger hands behind you." : "Raising builds the pot when ahead, but you need to be cautious of stronger hands."} At a ${tableSize}-handed table, position significantly affects the playability of this hand. ${positionContext}`;
+            }
+          } else if (!isAce && isSuited && highRankValue >= rankOrder.indexOf("K")) {
+            explanation = `${handString} is a strong suited hand.`;
+            reasoning = `Strong suited hands like KQs have good high card value and flush potential. ${isLatePosition ? "In late position, raising is optimal because you have position and can control the pot." : isEarlyPosition ? "In early position, raising is correct for value, but you need to be cautious of stronger hands." : "Raising builds the pot and can get value from weaker hands."} At a ${tableSize}-handed table, this hand plays well post-flop. ${positionContext}`;
+          } else if (becamePlayable) {
+            // Hand became playable due to table size or position
+            explanation = `${handString} becomes playable ${isLatePosition ? "from late position" : `at a ${tableSize}-handed table`}.`;
+            if (isHeadsUp) {
+              reasoning = `Heads-up, ranges are very wide. ${handString} has enough equity to be playable. With only one opponent, you can raise for value or as a bluff, and your position advantage makes this profitable.`;
+            } else if (isShortHanded) {
+              reasoning = `At a short-handed table (${tableSize} players), ${handString} becomes playable. ${isLatePosition ? "In late position, you can raise because you act last and have more control." : isEarlyPosition ? "However, from early position, this hand should still fold." : ""} With fewer opponents, the chance of someone having a stronger hand is reduced, making this hand profitable to raise.`;
+            } else {
+              reasoning = `${isLatePosition ? "In late position, " : ""}At a ${tableSize}-handed table, ${handString} is ${isLatePosition ? "playable because you act last and can control the pot." : "on the edge of playability."} Raising can work, but you need to be selective about when to continue post-flop. ${positionContext}`;
+            }
           } else {
-            reasoning = `At a ${tableSize}-handed table, ${handString} is on the edge of playability. ${isSuited ? "Being suited gives you flush potential, making it worth raising." : "Raising can work, but you need to be cautious of stronger hands."}`;
+            // Default explanation for raise
+            explanation = `${handString} is a strong hand from ${position}.`;
+            reasoning = `At a ${tableSize}-handed table, raising builds the pot and can get value from weaker hands. ${isLatePosition ? "In late position, raising is optimal because you have position and can control the pot post-flop." : isEarlyPosition ? "In early position, raising is correct for value, but you need to be cautious of stronger hands behind you." : "Raising is the optimal GTO play for this hand."} ${positionContext}`;
           }
-        } else if (isPair && highRankValue >= rankOrder.indexOf("7") && highRankValue < rankOrder.indexOf("T")) {
-          explanation = `${handString} is a medium pair.`;
-          reasoning = `Medium pairs (77-99) have decent equity but are vulnerable to overcards. At a ${tableSize}-handed table, raising builds the pot when ahead and can force folds from weaker hands. In ${position}, raising is preferred over calling because it builds value and gives you initiative. ${correctActions.includes("call") ? "However, calling can also be acceptable to control pot size." : ""}`;
-        } else if (isAce && highRankValue >= rankOrder.indexOf("Q")) {
-          if (isSuited) {
-            explanation = `${handString} is a strong ace-suited hand.`;
-            reasoning = `AQs has excellent high card value and flush potential. At a ${tableSize}-handed table, raising builds the pot and can get value from weaker hands. In ${position}, raising is optimal because you have a strong hand that plays well post-flop and can dominate weaker ace hands.`;
-          } else {
-            explanation = `${handString} is a strong ace offsuit hand.`;
-            reasoning = `AQo has good high card value but is vulnerable to AK and pairs. At a ${tableSize}-handed table, raising builds the pot when ahead, but you need to be cautious of stronger hands. ${isEarlyPosition ? "In early position, this is more marginal." : ""}`;
-          }
-        } else if (!isAce && isSuited && highRankValue >= rankOrder.indexOf("K")) {
-          explanation = `${handString} is a strong suited hand.`;
-          reasoning = `Strong suited hands like KQs have good high card value and flush potential. At a ${tableSize}-handed table, raising builds the pot and can get value from weaker hands. In ${position}, raising is optimal because you have a hand that plays well post-flop.`;
-        } else if (becamePlayable) {
-          // Hand became playable due to table size
-          explanation = `${handString} becomes playable at a ${tableSize}-handed table.`;
-          if (isHeadsUp) {
-            reasoning = `Heads-up, ranges are very wide. ${handString} has enough equity to be playable. With only one opponent, you can raise for value or as a bluff, and your position advantage makes this profitable.`;
-          } else if (isShortHanded) {
-            reasoning = `At a short-handed table (${tableSize} players), ${handString} becomes playable. With fewer opponents, the chance of someone having a stronger hand is reduced, making this hand profitable to raise.`;
-          } else {
-            reasoning = `At a ${tableSize}-handed table, ${handString} is on the edge of playability. Raising can work, but you need to be selective about when to continue post-flop.`;
-          }
-        } else {
-          // Default explanation for raise
-          explanation = `${handString} is a strong hand from ${position}.`;
-          reasoning = `At a ${tableSize}-handed table, raising builds the pot and can get value from weaker hands. In ${position}, raising is the optimal GTO play for this hand.`;
         }
-      }
     } else if (optimalAction === "call") {
       if (becamePlayable && isAce && highRankValue < rankOrder.indexOf("Q")) {
         // Weak aces that became playable due to table size
@@ -198,12 +207,15 @@ export function getGTOExplanation(
     reasoning += ` At a full ring table (${tableSize} players), ranges are tighter since more players can have strong hands.`;
   }
   
-  if (isBlind && optimalAction !== "fold") {
-    reasoning += ` As a blind, you're already invested in the pot, which slightly improves your pot odds.`;
-  } else if (isLatePosition && optimalAction !== "fold") {
-    reasoning += ` Late position gives you an advantage post-flop, allowing you to play more hands profitably.`;
-  } else if (isEarlyPosition && optimalAction !== "fold") {
-    reasoning += ` Early position is challenging because many players act after you, so you need stronger hands to play.`;
+  // Position-specific reasoning (only add if not already covered)
+  if (optimalAction !== "fold" && !reasoning.includes("position")) {
+    if (isBlind) {
+      reasoning += ` As a blind, you're already invested in the pot, which slightly improves your pot odds.`;
+    } else if (isLatePosition) {
+      reasoning += ` Late position (CO/BTN) gives you a significant advantage because you act last, allowing you to play more hands profitably and control the pot size.`;
+    } else if (isEarlyPosition) {
+      reasoning += ` Early position (UTG/UTG+1) is challenging because many players act after you, so you need stronger hands to play. This is why ranges are tighter from early position.`;
+    }
   }
 
   return {

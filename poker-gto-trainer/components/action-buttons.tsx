@@ -6,16 +6,21 @@ import { Action } from "@/lib/gto";
 import { BettingAction } from "@/lib/postflop-gto";
 
 export function ActionButtons() {
-  const { playerHand, gameStage, actionToFace, isPlayerTurn, selectAction } = useGameStore();
+  const { playerHand, gameStage, actionToFace, isPlayerTurn, currentBet, selectAction } = useGameStore();
 
   if (!playerHand || !isPlayerTurn) {
     return null;
   }
 
   const isPreflop = gameStage === "preflop";
+  // Always show all available actions - let GTO feedback tell user if it's correct
+  // Check is available post-flop when no bet to face
   const canCheck = !isPreflop && (actionToFace === "check" || actionToFace === null);
+  // Bet is available post-flop when no bet to face
   const canBet = !isPreflop && (actionToFace === "check" || actionToFace === null);
-  const canCall = actionToFace === "bet" || actionToFace === "raise";
+  // Call is available when facing a bet or in preflop with BB to call
+  const canCall = actionToFace === "bet" || actionToFace === "raise" || (isPreflop && currentBet > 0);
+  // Raise is always available (preflop or when facing a bet)
 
   return (
     <div className="flex gap-4 justify-center items-center flex-wrap">
@@ -28,6 +33,7 @@ export function ActionButtons() {
         Fold
       </Button>
       
+      {/* Always show Check button post-flop when it's a valid action */}
       {canCheck && (
         <Button
           variant="secondary"
@@ -39,6 +45,7 @@ export function ActionButtons() {
         </Button>
       )}
       
+      {/* Always show Call button when facing a bet */}
       {canCall && (
         <Button
           variant="secondary"
@@ -46,21 +53,11 @@ export function ActionButtons() {
           onClick={() => selectAction("call")}
           className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-6 text-lg font-semibold"
         >
-          Call
+          Call {currentBet > 0 ? `(${currentBet} BB)` : ""}
         </Button>
       )}
       
-      {isPreflop && (
-        <Button
-          variant="secondary"
-          size="lg"
-          onClick={() => selectAction("call")}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-6 text-lg font-semibold"
-        >
-          Call
-        </Button>
-      )}
-      
+      {/* Always show Bet button post-flop when it's a valid action - don't hide based on GTO */}
       {canBet && (
         <Button
           variant="default"
@@ -72,6 +69,7 @@ export function ActionButtons() {
         </Button>
       )}
       
+      {/* Always show Raise button - available preflop or when facing a bet */}
       {(isPreflop || canCall) && (
         <Button
           variant="outline"
@@ -85,4 +83,3 @@ export function ActionButtons() {
     </div>
   );
 }
-

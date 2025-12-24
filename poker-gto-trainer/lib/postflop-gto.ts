@@ -206,18 +206,18 @@ export function simulateOpponentAction(
   potSizeBB: number,
   isAggressive: boolean = false
 ): PostFlopAction | null {
-  // Simplified opponent logic
+  // More aggressive opponent logic - bet more often
   const rand = Math.random();
   
-  if (rand < 0.3) {
-    // 30% chance to bet
-    const betSize = Math.floor(Math.random() * 3) + 2; // 2-4 BB
+  if (rand < 0.6) {
+    // 60% chance to bet (increased from 30%)
+    // Bet sizes relative to pot: 1/3 pot, 1/2 pot, 2/3 pot, or pot
+    const betMultipliers = [0.33, 0.5, 0.67, 1.0];
+    const multiplier = betMultipliers[Math.floor(Math.random() * betMultipliers.length)];
+    const betSize = Math.max(1, Math.round(potSizeBB * multiplier * 10) / 10); // At least 1 BB, rounded to 1 decimal
     return { action: "bet", betSizeBB: betSize };
-  } else if (rand < 0.5) {
-    // 20% chance to check
-    return { action: "check" };
   } else {
-    // 50% chance to check (passive)
+    // 40% chance to check
     return { action: "check" };
   }
 }

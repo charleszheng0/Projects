@@ -5,10 +5,32 @@ import { PokerCard } from "./poker-card";
 import { Badge } from "./ui/badge";
 
 export function PokerTable() {
-  const { playerHand, numPlayers, playerPosition, playerStackBB, playerStacksBB, pot, bigBlind, gameStage, communityCards } = useGameStore();
+  const { 
+    playerHand, 
+    numPlayers, 
+    playerPosition, 
+    playerSeat,
+    playerStackBB, 
+    playerStacksBB, 
+    playerBetsBB,
+    pot, 
+    currentBet,
+    bigBlind, 
+    gameStage, 
+    communityCards,
+    smallBlindSeat,
+    bigBlindSeat,
+    buttonSeat,
+    actionToFace,
+    showFeedbackModal,
+  } = useGameStore();
 
   // Create array of player positions around the table
   const playerPositions = Array.from({ length: numPlayers }, (_, i) => i);
+  
+  // Ensure arrays are initialized with defaults
+  const safePlayerStacksBB = playerStacksBB || Array(numPlayers).fill(100);
+  const safePlayerBetsBB = playerBetsBB || Array(numPlayers).fill(0);
 
   return (
     <div className="relative w-full max-w-4xl mx-auto aspect-[16/10]">
@@ -25,20 +47,12 @@ export function PokerTable() {
             <div className="text-yellow-200 text-xl font-bold">{pot} BB</div>
           </div>
 
-          {/* Community Cards */}
+          {/* Community Cards - Only show community cards in center */}
           {communityCards.length > 0 && (
             <div className="flex gap-2">
               {communityCards.map((card, index) => (
                 <PokerCard key={index} card={card} size="md" />
               ))}
-            </div>
-          )}
-
-          {/* Player hand display */}
-          {playerHand && (
-            <div className="flex gap-2">
-              <PokerCard card={playerHand.card1} size="md" />
-              <PokerCard card={playerHand.card2} size="md" />
             </div>
           )}
 
@@ -60,8 +74,12 @@ export function PokerTable() {
           const x = Math.cos(angle) * radius;
           const y = Math.sin(angle) * radius;
 
-          const isPlayerSeat = seat === 0; // Assuming seat 0 is the player
-          const stackBB = playerStacksBB[seat] || 100;
+          const isPlayerSeat = seat === playerSeat;
+          const stackBB = safePlayerStacksBB[seat] || 100;
+          const betBB = Math.max(0, safePlayerBetsBB[seat] || 0); // Ensure betBB is never negative
+          const isSmallBlind = seat === smallBlindSeat;
+          const isBigBlind = seat === bigBlindSeat;
+          const isButton = seat === buttonSeat;
 
           return (
             <div
@@ -73,24 +91,99 @@ export function PokerTable() {
                 transform: "translate(-50%, -50%)",
               }}
             >
-              {isPlayerSeat ? (
-                <div className="flex flex-col items-center gap-1">
+              <div className="flex flex-col items-center gap-1">
+                {/* Button indicator */}
+                {isButton && (
+                  <div className="bg-yellow-500 rounded-full w-6 h-6 flex items-center justify-center mb-1 border-2 border-yellow-300">
+                    <span className="text-black text-xs font-bold">D</span>
+                  </div>
+                )}
+                
+                {/* Player hand cards - positioned near player seat */}
+                {isPlayerSeat && playerHand && (
+                  <div className="flex gap-1 mb-1">
+                    <PokerCard card={playerHand.card1} size="sm" />
+                    <PokerCard card={playerHand.card2} size="sm" />
+                  </div>
+                )}
+                
+                {/* Player info */}
+                {isPlayerSeat ? (
                   <div className="bg-gray-800 rounded-lg px-3 py-1 border-2 border-yellow-400">
                     <div className="text-white text-xs font-semibold">You</div>
                     <div className="text-yellow-300 text-xs">{playerStackBB} BB</div>
                   </div>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center gap-1">
+                ) : (
                   <div className="bg-gray-800/60 rounded-lg px-3 py-1 border border-gray-600">
                     <div className="text-gray-300 text-xs">Player {seat + 1}</div>
                     <div className="text-gray-400 text-xs">{stackBB} BB</div>
                   </div>
-                </div>
-              )}
+                )}
+                
+                {/* Blind indicators */}
+                {isSmallBlind && gameStage === "preflop" && (
+                  <div className="bg-blue-600 rounded px-2 py-0.5 text-xs font-semibold text-white">
+                    SB
+                  </div>
+                )}
+                {isBigBlind && gameStage === "preflop" && (
+                  <div className="bg-red-600 rounded px-2 py-0.5 text-xs font-semibold text-white">
+                    BB
+                  </div>
+                )}
+                
+                {/* Bet display - visual chips */}
+                {betBB > 0 && (() => {
+                  // Ensure at least 1 chip for any bet > 0
+                  const chipCount = Math.max(1, Math.min(Math.ceil(betBB / 5), 5));
+                  const displayAmount = Math.round(betBB * 10) / 10; // Round to 1 decimal place
+                  
+                  return (
+                    <div className="relative flex items-center justify-center mt-1" style={{ height: '32px' }}>
+                      {/* Chip stack visualization - properly stacked */}
+                      {Array.from({ length: chipCount }).map((_, i) => {
+                        const offset = i * 2; // Small offset for stacking effect
+                        const rotation = i * 2; // Slight rotation for realism
+                        const isTopChip = i === chipCount - 1;
+                        
+                        return (
+                        <div
+                          key={i}
+                          className="absolute w-7 h-7 rounded-full border-2 border-yellow-300 bg-yellow-500 shadow-lg"
+                          style={{
+                            transform: `translateY(${-offset}px) rotate(${rotation}deg)`,
+                            zIndex: chipCount - i,
+                            bottom: 0,
+                          }}
+                        >
+                          <div className="w-full h-full rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center relative overflow-visible">
+                            {isTopChip && displayAmount > 0 && (
+                              <span 
+                                className="text-black text-[10px] font-bold leading-none select-none pointer-events-none whitespace-nowrap"
+                                style={{
+                                  transform: `rotate(${-rotation}deg)`, // Counter-rotate text to keep it readable
+                                  display: 'inline-block',
+                                  maxWidth: '100%',
+                                  textAlign: 'center',
+                                  lineHeight: '1',
+                                }}
+                              >
+                                {displayAmount}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                        })}
+                    </div>
+                  );
+                })()}
+              </div>
             </div>
           );
         })}
+        
+        {/* Visual bet indicators - chips shown at player positions, no text labels */}
       </div>
     </div>
   );

@@ -52,18 +52,21 @@ export function PokerCard({ card, className, size = "md", faceDown = false }: Po
   return (
     <div
       className={cn(
-        "rounded-lg border-2 border-gray-800 bg-white shadow-lg flex flex-col items-center justify-between p-1.5",
+        "rounded-lg border-2 border-gray-800 bg-white shadow-lg flex flex-col items-center justify-between relative",
         sizeClasses[size],
         className
       )}
     >
-      <div className={cn("font-bold self-start", suitColor)}>
+      {/* Top rank */}
+      <div className={cn("font-bold absolute top-1 left-1", suitColor, size === "sm" ? "text-xs" : size === "md" ? "text-sm" : "text-base")}>
         {rank}
       </div>
-      <div className={cn("text-2xl", suitColor)}>
+      {/* Center suit */}
+      <div className={cn("flex-1 flex items-center justify-center", suitColor, size === "sm" ? "text-lg" : size === "md" ? "text-2xl" : "text-3xl")}>
         {suitSymbol}
       </div>
-      <div className={cn("font-bold self-end rotate-180", suitColor)}>
+      {/* Bottom rank (rotated) */}
+      <div className={cn("font-bold absolute bottom-1 right-1 rotate-180", suitColor, size === "sm" ? "text-xs" : size === "md" ? "text-sm" : "text-base")}>
         {rank}
       </div>
     </div>
