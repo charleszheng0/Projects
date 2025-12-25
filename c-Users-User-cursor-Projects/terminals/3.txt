@@ -2,8 +2,7 @@
 pid: 33864
 cwd: |
   C:\Users\User\.cursor\Projects\poker-gto-trainer
-active_command: npm run dev
-last_command: npm run dev
+last_command: git push -u origin main
 last_exit_code: 1
 ---
 PS C:\Users\User\.cursor\Projects> cd C:\Users\User\.cursor\Projects\poker-gto-trainer
@@ -117,3 +116,89 @@ PS C:\Users\User\.cursor\Projects\poker-gto-trainer>
  GET /game 200 in 123ms (compile: 80ms, render: 43ms)
  GET / 200 in 107ms (compile: 6ms, render: 100ms)
  GET /game 200 in 123ms (compile: 96ms, render: 26ms)
+ GET / 200 in 111ms (compile: 16ms, render: 95ms)
+ GET /game 200 in 116ms (compile: 81ms, render: 35ms)
+✓ Compiled in 36ms
+ GET / 200 in 74ms (compile: 6ms, render: 69ms)
+ GET /game 200 in 122ms (compile: 88ms, render: 34ms)
+ GET / 200 in 74ms (compile: 5ms, render: 69ms)
+ GET /game 200 in 117ms (compile: 77ms, render: 40ms)
+ GET / 200 in 78ms (compile: 11ms, render: 67ms)
+ GET /game 200 in 117ms (compile: 82ms, render: 34ms)
+ GET / 200 in 79ms (compile: 10ms, render: 69ms)
+ GET /game 200 in 96ms (compile: 72ms, render: 23ms)
+ GET / 200 in 86ms (compile: 11ms, render: 76ms)
+ GET /game 200 in 141ms (compile: 97ms, render: 44ms)
+ GET / 200 in 90ms (compile: 22ms, render: 68ms)
+ GET /game 200 in 138ms (compile: 90ms, render: 49ms)
+ GET / 200 in 61ms (compile: 7ms, render: 54ms)
+ GET /game 200 in 122ms (compile: 80ms, render: 42ms)
+ GET / 200 in 68ms (compile: 5ms, render: 63ms)
+ GET /game 200 in 144ms (compile: 106ms, render: 38ms)
+ GET / 200 in 80ms (compile: 7ms, render: 72ms)
+ GET /game 200 in 113ms (compile: 95ms, render: 19ms)
+ GET / 200 in 85ms (compile: 8ms, render: 77ms)
+ GET /game 200 in 148ms (compile: 91ms, render: 57ms)
+ GET / 200 in 78ms (compile: 6ms, render: 72ms)
+ GET /game 200 in 100ms (compile: 82ms, render: 17ms)
+ GET / 200 in 75ms (compile: 7ms, render: 67ms)
+ GET /game 200 in 120ms (compile: 83ms, render: 37ms)
+✓ Compiled in 39ms
+ GET / 200 in 103ms (compile: 26ms, render: 77ms)
+ GET /game 200 in 131ms (compile: 99ms, render: 32ms)
+PS C:\Users\User\.cursor\Projects\poker-gto-trainer> 
+                                                     git --version
+>>
+git version 2.52.0.windows.1
+PS C:\Users\User\.cursor\Projects\poker-gto-trainer> gh auth login
+>>
+gh : The term 'gh' is not recognized as the name of a cmdlet, function, script file, or operable program. Check the spelling of the name, or if a path was included, verify that the path is 
+correct and try again.
+At line:1 char:1
++ gh auth login
++ ~~
+    + CategoryInfo          : ObjectNotFound: (gh:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+
+PS C:\Users\User\.cursor\Projects\poker-gto-trainer> gh auth status
+>>
+gh : The term 'gh' is not recognized as the name of a cmdlet, function, script file, or operable program. Check the spelling of the name, or if a path was included, verify that the path is 
+correct and try again.
+At line:1 char:1
++ gh auth status
++ ~~
+    + CategoryInfo          : ObjectNotFound: (gh:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+
+PS C:\Users\User\.cursor\Projects\poker-gto-trainer> # Navigate to your project
+>> cd C:\Users\User\.cursor\Projects\poker-gto-trainer
+>>
+>> # Stage all changes
+>> git add .
+>>
+>> # Commit your changes
+>> git commit -m "Initial commit - Poker GTO Trainer project"
+[main 0df23ad] Initial commit - Poker GTO Trainer project
+ 13 files changed, 860 insertions(+), 218 deletions(-)
+ create mode 100644 poker-gto-trainer/Requirements/WPT-Global-8-max.jpg
+ create mode 100644 poker-gto-trainer/Requirements/betsizingbuttons.png
+ create mode 100644 poker-gto-trainer/Requirements/tablebetting.png
+ create mode 100644 poker-gto-trainer/components/betting-chips.tsx
+PS C:\Users\User\.cursor\Projects\poker-gto-trainer> # Add the remote repository
+>> git remote add origin https://github.com/YOUR_USERNAME/poker-gto-trainer.git
+>>
+>> # Push your code to GitHub
+>> git push -u origin main
+info: please complete authentication in your browser...
+remote: Repository not found.
+fatal: repository 'https://github.com/YOUR_USERNAME/poker-gto-trainer.git/' not found
+PS C:\Users\User\.cursor\Projects\poker-gto-trainer> git remote add origin https://github.com/charleszheng0/poker-gto-trainer.git        
+PS C:\Users\User\.cursor\Projects\poker-gto-trainer> git push -u origin main
+info: please complete authentication in your browser...
+remote: Repository not found.
+fatal: repository 'https://github.com/charleszheng0/poker-gto-trainer.git/' not found
+PS C:\Users\User\.cursor\Projects\poker-gto-trainer>    git push -u origin main
+info: please complete authentication in your browser...
+remote: Repository not found.
+fatal: repository 'https://github.com/charleszheng0/poker-gto-trainer.git/' not found
+PS C:\Users\User\.cursor\Projects\poker-gto-trainer>
