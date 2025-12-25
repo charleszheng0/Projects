@@ -7,6 +7,7 @@ import { Badge } from "./ui/badge";
 export function PokerTable() {
   const { 
     playerHand, 
+    opponentHands,
     numPlayers, 
     playerPosition, 
     playerSeat,
@@ -23,6 +24,8 @@ export function PokerTable() {
     buttonSeat,
     actionToFace,
     showFeedbackModal,
+    foldedPlayers,
+    lastActorSeat,
   } = useGameStore();
 
   // Create array of player positions around the table
@@ -31,6 +34,7 @@ export function PokerTable() {
   // Ensure arrays are initialized with defaults
   const safePlayerStacksBB = playerStacksBB || Array(numPlayers).fill(100);
   const safePlayerBetsBB = playerBetsBB || Array(numPlayers).fill(0);
+  const safeFoldedPlayers = foldedPlayers || Array(numPlayers).fill(false);
 
   return (
     <div className="relative w-full max-w-4xl mx-auto aspect-[16/10]">
@@ -80,6 +84,9 @@ export function PokerTable() {
           const isSmallBlind = seat === smallBlindSeat;
           const isBigBlind = seat === bigBlindSeat;
           const isButton = seat === buttonSeat;
+          const isFolded = safeFoldedPlayers[seat] || false;
+          const isActive = !isFolded;
+          const justActed = lastActorSeat === seat;
 
           return (
             <div
@@ -107,16 +114,60 @@ export function PokerTable() {
                   </div>
                 )}
                 
+                {/* Opponent hand cards - face down */}
+                {!isPlayerSeat && opponentHands[seat] && !isFolded && (
+                  <div className="flex gap-1 mb-1">
+                    <PokerCard card={opponentHands[seat]!.card1} size="sm" faceDown={true} />
+                    <PokerCard card={opponentHands[seat]!.card2} size="sm" faceDown={true} />
+                  </div>
+                )}
+                
                 {/* Player info */}
                 {isPlayerSeat ? (
-                  <div className="bg-gray-800 rounded-lg px-3 py-1 border-2 border-yellow-400">
+                  <div className={`rounded-lg px-3 py-1 border-2 ${
+                    isFolded 
+                      ? "bg-gray-900/80 border-gray-700 opacity-50" 
+                      : "bg-gray-800 border-yellow-400"
+                  }`}>
                     <div className="text-white text-xs font-semibold">You</div>
                     <div className="text-yellow-300 text-xs">{playerStackBB} BB</div>
+                    {isFolded && (
+                      <div className="text-red-400 text-[10px] font-bold mt-0.5">FOLDED</div>
+                    )}
+                    {isActive && !isFolded && (
+                      <div className="text-green-400 text-[10px] font-semibold mt-0.5">ACTIVE</div>
+                    )}
+                    {justActed && !isFolded && (
+                      <div className="text-blue-300 text-[10px] font-bold mt-0.5 animate-pulse">BET</div>
+                    )}
                   </div>
                 ) : (
-                  <div className="bg-gray-800/60 rounded-lg px-3 py-1 border border-gray-600">
-                    <div className="text-gray-300 text-xs">Player {seat + 1}</div>
-                    <div className="text-gray-400 text-xs">{stackBB} BB</div>
+                  <div className={`rounded-lg px-3 py-1 border ${
+                    isFolded 
+                      ? "bg-gray-900/80 border-gray-700 opacity-50" 
+                      : justActed
+                      ? "bg-blue-900/80 border-blue-500 border-2"
+                      : "bg-gray-800/60 border-gray-600"
+                  }`}>
+                    <div className={`text-xs ${
+                      isFolded ? "text-gray-500" : "text-gray-300"
+                    }`}>
+                      Player {seat + 1}
+                    </div>
+                    <div className={`text-xs ${
+                      isFolded ? "text-gray-600" : "text-gray-400"
+                    }`}>
+                      {stackBB} BB
+                    </div>
+                    {isFolded && (
+                      <div className="text-red-400 text-[10px] font-bold mt-0.5">FOLDED</div>
+                    )}
+                    {isActive && !isFolded && (
+                      <div className="text-green-400 text-[10px] font-semibold mt-0.5">ACTIVE</div>
+                    )}
+                    {justActed && !isFolded && (
+                      <div className="text-blue-300 text-[10px] font-bold mt-0.5 animate-pulse">BET</div>
+                    )}
                   </div>
                 )}
                 
@@ -132,8 +183,8 @@ export function PokerTable() {
                   </div>
                 )}
                 
-                {/* Bet display - visual chips */}
-                {betBB > 0 && (() => {
+                {/* Bet display - visual chips (only show if player is active) */}
+                {betBB > 0 && !isFolded && (() => {
                   // Ensure at least 1 chip for any bet > 0
                   const chipCount = Math.max(1, Math.min(Math.ceil(betBB / 5), 5));
                   const displayAmount = Math.round(betBB * 10) / 10; // Round to 1 decimal place

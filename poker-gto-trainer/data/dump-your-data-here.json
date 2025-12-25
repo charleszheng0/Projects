@@ -1,0 +1,13 @@
+[
+  {
+    "playerHand": "As Ks",
+    "playerPosition": "BTN",
+    "numPlayers": 6,
+    "gameStage": "preflop",
+    "pot": 1.5,
+    "currentBet": 2,
+    "playerAction": "raise",
+    "betSizeBB": 5
+  }
+]
+
