@@ -293,7 +293,7 @@ export function RangeVisualizer({
             <span className="text-gray-300">Call (Suited)</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-pink-300 rounded"></div>
+            <div className="w-6 h-6 bg-pink-200 rounded"></div>
             <span className="text-gray-300">Call (Offsuit)</span>
           </div>
           <div className="flex items-center gap-2">

@@ -28,7 +28,7 @@ export function ActionButtons() {
         variant="destructive"
         size="lg"
         onClick={() => selectAction("fold")}
-        className="bg-red-600 hover:bg-red-700 text-white px-8 py-6 text-lg font-semibold"
+        className="bg-gray-700 hover:bg-gray-800 text-white px-8 py-6 text-lg font-semibold"
       >
         Fold
       </Button>
@@ -51,7 +51,7 @@ export function ActionButtons() {
           variant="secondary"
           size="lg"
           onClick={() => selectAction("call")}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-6 text-lg font-semibold"
+          className="bg-yellow-600 hover:bg-yellow-700 text-white px-8 py-6 text-lg font-semibold"
         >
           Call {currentBet > 0 ? `(${currentBet} BB)` : ""}
         </Button>
@@ -75,7 +75,7 @@ export function ActionButtons() {
           variant="outline"
           size="lg"
           onClick={() => selectAction("raise")}
-          className="bg-yellow-600 hover:bg-yellow-700 text-white px-8 py-6 text-lg font-semibold border-2"
+          className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-6 text-lg font-semibold border-2"
         >
           {isPreflop ? "Raise" : "Raise"}
         </Button>
