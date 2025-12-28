@@ -2,9 +2,6 @@
 pid: 12056
 cwd: |
   C:\Users\User\.cursor\Projects\poker-gto-trainer
-active_command: npm run dev
-last_command: npm run dev
-last_exit_code: 1
 ---
 PS C:\Users\User\.cursor\Projects> npm run dev
 npm error code ENOENT
@@ -666,3 +663,22 @@ You can claim your keys by visiting https://dashboard.clerk.com/apps/claim?token
  POST / 200 in 44ms (compile: 7ms, proxy.ts: 20ms, render: 17ms)
  POST / 200 in 47ms (compile: 7ms, proxy.ts: 16ms, render: 23ms)
   Reload env: .env.local
+✓ Compiled in 891ms
+PS C:\Users\User\.cursor\Projects\poker-gto-trainer> 
+                                                     npm run dev
+
+> poker-gto-trainer@0.1.0 dev
+> cross-env NEXT_TELEMETRY_DISABLED=1 next dev
+
+▲ Next.js 16.1.1 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.22:3000
+- Environments: .env.local
+
+✓ Starting...
+✓ Ready in 1479ms
+ GET / 200 in 1390ms (compile: 762ms, proxy.ts: 320ms, render: 309ms)
+ POST / 200 in 38ms (compile: 7ms, proxy.ts: 14ms, render: 18ms)
+PS C:\Users\User\.cursor\Projects\poker-gto-trainer> 
+                                                     ^C
+PS C:\Users\User\.cursor\Projects\poker-gto-trainer>
