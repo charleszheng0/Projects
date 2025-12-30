@@ -58,3 +58,24 @@ PS C:\Users\User\.cursor\Projects\poker-gto-trainer>
  GET /dataset 200 in 481ms (compile: 443ms, proxy.ts: 15ms, render: 23ms)
  GET /simulator 200 in 42ms (compile: 4ms, proxy.ts: 19ms, render: 19ms)
  GET /analytics 200 in 443ms (compile: 403ms, proxy.ts: 17ms, render: 22ms)
+PS C:\Users\User\.cursor\Projects\poker-gto-trainer> 
+                                                     npm run dev
+
+> poker-gto-trainer@0.1.0 dev
+> cross-env NEXT_TELEMETRY_DISABLED=1 next dev
+
+▲ Next.js 16.1.1 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.22:3000
+- Environments: .env.local
+
+✓ Starting...
+✓ Ready in 1774ms
+ GET / 200 in 2.2s (compile: 698ms, proxy.ts: 1203ms, render: 256ms)
+ POST / 200 in 43ms (compile: 8ms, proxy.ts: 18ms, render: 17ms)
+ GET /game 200 in 270ms (compile: 208ms, proxy.ts: 23ms, render: 39ms)
+ GET /analytics 200 in 78ms (compile: 46ms, proxy.ts: 12ms, render: 20ms)
+ GET /ranges 200 in 109ms (compile: 66ms, proxy.ts: 23ms, render: 20ms)
+ GET /simulator 200 in 140ms (compile: 107ms, proxy.ts: 10ms, render: 23ms)
+ GET /dataset 200 in 83ms (compile: 46ms, proxy.ts: 20ms, render: 17ms)
+ GET /game 200 in 41ms (compile: 4ms, proxy.ts: 21ms, render: 17ms)

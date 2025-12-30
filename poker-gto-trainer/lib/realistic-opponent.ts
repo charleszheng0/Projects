@@ -40,32 +40,37 @@ export interface OpponentStats {
  */
 export const DEFAULT_OPPONENT_STATS: OpponentStats = {
   preflop: {
-    UTG: { fold: 0.75, call: 0.15, raise: 0.10 },
-    "UTG+1": { fold: 0.70, call: 0.18, raise: 0.12 },
-    MP: { fold: 0.65, call: 0.20, raise: 0.15 },
-    CO: { fold: 0.55, call: 0.25, raise: 0.20 },
-    BTN: { fold: 0.45, call: 0.30, raise: 0.25 },
-    SB: { fold: 0.50, call: 0.35, raise: 0.15 },
-    BB: { fold: 0.40, call: 0.50, raise: 0.10 },
+    // More realistic VPIP (Voluntarily Put money In Pot) and betting frequencies
+    // Typical online poker: VPIP ~20-30%, PFR (Preflop Raise) ~15-20%
+    UTG: { fold: 0.70, call: 0.20, raise: 0.10 }, // Tight early position
+    "UTG+1": { fold: 0.68, call: 0.22, raise: 0.10 },
+    MP: { fold: 0.65, call: 0.25, raise: 0.10 }, // Slightly looser
+    CO: { fold: 0.60, call: 0.25, raise: 0.15 }, // More aggressive
+    BTN: { fold: 0.50, call: 0.30, raise: 0.20 }, // Most aggressive position
+    SB: { fold: 0.55, call: 0.30, raise: 0.15 }, // Defend more often
+    BB: { fold: 0.45, call: 0.45, raise: 0.10 }, // Defend wide (already invested)
   },
   postflop: {
     flop: {
-      "0-0.3": { fold: 0.85, call: 0.10, bet: 0.05, raise: 0.0 }, // Weak hands fold most
-      "0.3-0.5": { fold: 0.60, call: 0.30, bet: 0.08, raise: 0.02 },
-      "0.5-0.7": { fold: 0.20, call: 0.50, bet: 0.25, raise: 0.05 },
-      "0.7-1.0": { fold: 0.05, call: 0.20, bet: 0.60, raise: 0.15 }, // Strong hands bet/raise
+      // More betting frequency - typical online poker has ~30-40% betting frequency on flop
+      "0-0.3": { fold: 0.80, call: 0.15, bet: 0.05, raise: 0.0 }, // Weak hands still fold often, but some bluffs
+      "0.3-0.5": { fold: 0.50, call: 0.35, bet: 0.12, raise: 0.03 }, // More betting with medium hands
+      "0.5-0.7": { fold: 0.15, call: 0.40, bet: 0.35, raise: 0.10 }, // Strong hands bet more often
+      "0.7-1.0": { fold: 0.03, call: 0.15, bet: 0.65, raise: 0.17 }, // Premium hands bet/raise aggressively
     },
     turn: {
-      "0-0.3": { fold: 0.90, call: 0.08, bet: 0.02, raise: 0.0 },
-      "0.3-0.5": { fold: 0.70, call: 0.25, bet: 0.04, raise: 0.01 },
-      "0.5-0.7": { fold: 0.30, call: 0.40, bet: 0.25, raise: 0.05 },
-      "0.7-1.0": { fold: 0.10, call: 0.25, bet: 0.50, raise: 0.15 },
+      // Turn betting frequency increases (value betting and protection)
+      "0-0.3": { fold: 0.85, call: 0.12, bet: 0.03, raise: 0.0 },
+      "0.3-0.5": { fold: 0.65, call: 0.28, bet: 0.06, raise: 0.01 },
+      "0.5-0.7": { fold: 0.25, call: 0.35, bet: 0.30, raise: 0.10 },
+      "0.7-1.0": { fold: 0.05, call: 0.20, bet: 0.55, raise: 0.20 },
     },
     river: {
-      "0-0.3": { fold: 0.95, call: 0.04, bet: 0.01, raise: 0.0 },
-      "0.3-0.5": { fold: 0.80, call: 0.18, bet: 0.02, raise: 0.0 },
-      "0.5-0.7": { fold: 0.40, call: 0.45, bet: 0.12, raise: 0.03 },
-      "0.7-1.0": { fold: 0.15, call: 0.30, bet: 0.45, raise: 0.10 },
+      // River: more polarized betting (value bets and bluffs)
+      "0-0.3": { fold: 0.90, call: 0.08, bet: 0.02, raise: 0.0 },
+      "0.3-0.5": { fold: 0.75, call: 0.20, bet: 0.04, raise: 0.01 },
+      "0.5-0.7": { fold: 0.35, call: 0.40, bet: 0.20, raise: 0.05 },
+      "0.7-1.0": { fold: 0.10, call: 0.25, bet: 0.50, raise: 0.15 },
     },
   },
   betSizing: {
@@ -147,94 +152,64 @@ export function simulateRealisticPostflopAction(
     return { action: "check" };
   }
 
-  // If facing a bet, adjust probabilities (fold more, call more, raise less)
+  // Use the stats-based probabilities for more realistic play
+  const rand = Math.random();
+  let cumulative = 0;
+
+  // Adjust probabilities based on facing action
   let adjustedStats = { ...rangeStats };
   if (actionToFace === "bet" || actionToFace === "raise") {
-    // When facing a bet, fold probability increases significantly for weak hands
+    // When facing a bet, adjust probabilities
     if (handStrength < 0.5) {
-      adjustedStats.fold = Math.min(0.95, rangeStats.fold + 0.2);
-      adjustedStats.call = rangeStats.call * 0.7;
-      adjustedStats.bet = 0;
-      adjustedStats.raise = 0;
-    } else if (handStrength < 0.7) {
-      adjustedStats.fold = Math.min(0.85, rangeStats.fold + 0.15);
+      adjustedStats.fold = Math.min(0.95, rangeStats.fold + 0.15);
       adjustedStats.call = rangeStats.call * 0.8;
       adjustedStats.bet = 0;
-      adjustedStats.raise = rangeStats.raise * 0.5;
+      adjustedStats.raise = rangeStats.raise * 0.3;
+    } else if (handStrength < 0.7) {
+      adjustedStats.fold = Math.min(0.80, rangeStats.fold + 0.10);
+      adjustedStats.call = rangeStats.call * 0.9;
+      adjustedStats.bet = 0;
+      adjustedStats.raise = rangeStats.raise * 0.7;
     }
+    // Strong hands keep their raise frequency
   }
 
-  // More optimal play: bet/raise more aggressively with strong hands
-  // Calculate action based on probabilities, but bias towards optimal play
-  
-  // Strong hands (0.7+) should bet/raise more often
-  if (handStrength >= 0.7) {
-    if (actionToFace === "bet" || actionToFace === "raise") {
-      // Strong hand facing a bet - raise more often (70% chance)
-      if (Math.random() < 0.7) {
-        const multiplier = stats.betSizing.valueBet[Math.floor(Math.random() * stats.betSizing.valueBet.length)];
-        const raiseSize = Math.max(currentBet * 2.5, Math.round(potSizeBB * multiplier * 10) / 10);
-        return { action: "raise", betSizeBB: raiseSize };
-      }
-      // Otherwise call
-      return { action: "call" };
-    } else {
-      // Strong hand, no bet to face - bet aggressively (80% chance)
-      if (Math.random() < 0.8) {
-        const multiplier = stats.betSizing.valueBet[Math.floor(Math.random() * stats.betSizing.valueBet.length)];
-        const betSize = Math.max(1, Math.round(potSizeBB * multiplier * 10) / 10);
-        return { action: "bet", betSizeBB: betSize };
-      }
-      return { action: "check" };
-    }
+  // Normalize probabilities
+  const total = adjustedStats.fold + adjustedStats.call + adjustedStats.bet + adjustedStats.raise;
+  if (total > 0) {
+    adjustedStats.fold /= total;
+    adjustedStats.call /= total;
+    adjustedStats.bet /= total;
+    adjustedStats.raise /= total;
   }
-  
-  // Medium-strong hands (0.5-0.7) - bet sometimes, call often
-  if (handStrength >= 0.5) {
-    if (actionToFace === "bet" || actionToFace === "raise") {
-      // Call more often with medium hands (80% call, 20% raise)
-      if (Math.random() < 0.2) {
-        const multiplier = stats.betSizing.valueBet[0]; // Smaller raise
-        const raiseSize = Math.max(currentBet * 2, Math.round(potSizeBB * multiplier * 10) / 10);
-        return { action: "raise", betSizeBB: raiseSize };
-      }
-      return { action: "call" };
-    } else {
-      // Bet sometimes (40% bet, 60% check)
-      if (Math.random() < 0.4) {
-        const multiplier = stats.betSizing.valueBet[Math.floor(Math.random() * stats.betSizing.valueBet.length)];
-        const betSize = Math.max(1, Math.round(potSizeBB * multiplier * 10) / 10);
-        return { action: "bet", betSizeBB: betSize };
-      }
-      return { action: "check" };
-    }
+
+  // Determine action based on probabilities
+  cumulative += adjustedStats.fold;
+  if (rand < cumulative) {
+    return { action: "fold" };
   }
-  
-  // Weak hands (0.3-0.5) - fold more, call sometimes
-  if (handStrength >= 0.3) {
-    if (actionToFace === "bet" || actionToFace === "raise") {
-      // Fold more often with weak hands (60% fold, 40% call)
-      if (Math.random() < 0.6) {
-        return { action: "fold" };
-      }
-      return { action: "call" };
-    } else {
-      // Check with weak hands
-      return { action: "check" };
-    }
-  }
-  
-  // Very weak hands (<0.3) - fold almost always
-  if (actionToFace === "bet" || actionToFace === "raise") {
-    // Fold 90% of the time with very weak hands
-    if (Math.random() < 0.9) {
-      return { action: "fold" };
-    }
+
+  cumulative += adjustedStats.call;
+  if (rand < cumulative) {
     return { action: "call" };
   }
-  
-  // Very weak hand, no bet - check
-  return { action: "check" };
+
+  cumulative += adjustedStats.bet;
+  if (rand < cumulative) {
+    // Betting - use appropriate sizing
+    const multiplier = handStrength >= 0.7 
+      ? stats.betSizing.valueBet[Math.floor(Math.random() * stats.betSizing.valueBet.length)]
+      : stats.betSizing.bluffBet[Math.floor(Math.random() * stats.betSizing.bluffBet.length)];
+    const betSize = Math.max(1, Math.round(potSizeBB * multiplier * 10) / 10);
+    return { action: "bet", betSizeBB: betSize };
+  }
+
+  // Raise
+  const multiplier = handStrength >= 0.7
+    ? stats.betSizing.valueBet[Math.floor(Math.random() * stats.betSizing.valueBet.length)]
+    : stats.betSizing.bluffBet[0];
+  const raiseSize = Math.max(currentBet * 2, Math.round(potSizeBB * multiplier * 10) / 10);
+  return { action: "raise", betSizeBB: raiseSize };
 }
 
 /**

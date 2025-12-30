@@ -142,7 +142,8 @@ export const useGameStore = create<GameState>((set) => ({
     const playerPosition = getPositionFromSeat(playerSeat, numPlayers);
     
     // Generate all hands at once to ensure no duplicate cards
-    const allHands = generateUniqueHands(numPlayers);
+    // Use weighted generation for player hand (more playable hands)
+    const allHands = generateUniqueHands(numPlayers, [], true);
     const playerHand = allHands[playerSeat];
     
     // Create opponent hands array
@@ -222,17 +223,25 @@ export const useGameStore = create<GameState>((set) => ({
         // Check what GTO says for this hand in this position
         const gtoResult = getGTOAction(opponentHand, seatPosition, "call", numPlayers);
         
-        // If GTO says fold, fold more often (85% fold rate)
+        // More realistic opponent play based on GTO
+        // If GTO says fold, fold often but not always (80% fold rate - some players call with bad hands)
         if (gtoResult.optimalActions.includes("fold")) {
-          opponentAction = Math.random() < 0.85 ? "fold" : "call";
+          opponentAction = Math.random() < 0.80 ? "fold" : "call";
         } 
-        // If GTO says raise/all-in, raise more often (75% raise rate)
+        // If GTO says raise/all-in, raise more often (70% raise rate - some slowplay)
         else if (gtoResult.optimalActions.includes("raise") || gtoResult.optimalActions.includes("all-in")) {
-          opponentAction = Math.random() < 0.75 ? "raise" : "call";
+          opponentAction = Math.random() < 0.70 ? "raise" : "call";
         }
-        // Otherwise call (GTO says call)
+        // Otherwise call (GTO says call) - but sometimes raise for value
         else {
-          opponentAction = Math.random() < 0.7 ? "call" : "fold";
+          const rand = Math.random();
+          if (rand < 0.65) {
+            opponentAction = "call";
+          } else if (rand < 0.85) {
+            opponentAction = "fold"; // Some players fold calling hands
+          } else {
+            opponentAction = "raise"; // Some players raise for value
+          }
         }
       } else {
         // Fallback to position-based simulation
@@ -246,13 +255,14 @@ export const useGameStore = create<GameState>((set) => ({
       const previousBet = finalBets[actingSeat] || 0;
       
       if (opponentAction === "raise" && actingSeat !== smallBlindSeat && actingSeat !== bigBlindSeat) {
-        // Opponent raises (2.5x to 4x BB)
+        // Opponent raises (2.5x to 4x BB) - more realistic sizing
         const raiseSize = Math.round(INITIAL_BIG_BLIND * (2.5 + Math.random() * 1.5) * 10) / 10;
         finalBets[actingSeat] = raiseSize;
         finalCurrentBet = raiseSize;
         // Add the additional amount to pot (raiseSize - previousBet)
         finalPot += raiseSize - previousBet;
         finalActionToFace = "call";
+        // More raises = harder decisions for player
       } else if (opponentAction === "call") {
         // Opponent calls
         const callAmount = finalCurrentBet;

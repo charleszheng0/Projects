@@ -1,11 +1,27 @@
 import { Hand, Position, Action } from "./gto";
 import { formatHand } from "./gto";
 import gtoRanges from "./gto-ranges.json";
+import { 
+  categorizeHandStrength, 
+  getHandStrengthDescription, 
+  getHandStrengthExplanation,
+  getStreetNumber,
+  getStreetDescription,
+  getStreetExplanation,
+  HandStrengthCategory,
+  StreetNumber
+} from "./hand-categorization";
 
 export interface GTOExplanation {
   correctActions: Action[];
   explanation: string;
   reasoning: string;
+  handStrengthCategory?: HandStrengthCategory;
+  handStrengthDescription?: string;
+  handStrengthExplanation?: string;
+  streetNumber?: StreetNumber;
+  streetDescription?: string;
+  streetExplanation?: string;
 }
 
 export function getGTOExplanation(
@@ -67,6 +83,16 @@ export function getGTOExplanation(
     : isMiddlePosition
     ? "Middle position requires moderate ranges - tighter than late position but looser than early position."
     : "Blind positions have already invested chips, which improves pot odds but limits positional advantage.";
+
+  // Categorize hand strength
+  const handStrengthCategory = categorizeHandStrength(hand);
+  const handStrengthDescription = getHandStrengthDescription(handStrengthCategory);
+  const handStrengthExplanation = getHandStrengthExplanation(handStrengthCategory);
+  
+  // Get street information (preflop = first street)
+  const streetNumber = getStreetNumber("preflop");
+  const streetDescription = getStreetDescription(streetNumber);
+  const streetExplanation = getStreetExplanation(streetNumber);
 
   // Use the optimalActions passed in (from getGTOAction)
   const correctActions = optimalActions;
@@ -218,10 +244,19 @@ export function getGTOExplanation(
     }
   }
 
+  // Add hand strength information to reasoning (but we'll display it separately in UI)
+  // Keep reasoning clean, we'll show category/street info in separate UI sections
+
   return {
     correctActions,
     explanation,
     reasoning,
+    handStrengthCategory,
+    handStrengthDescription,
+    handStrengthExplanation,
+    streetNumber,
+    streetDescription,
+    streetExplanation,
   };
 }
 
