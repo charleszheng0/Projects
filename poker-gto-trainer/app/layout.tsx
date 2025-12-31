@@ -34,6 +34,44 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang="en">
+        <head>
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `
+                // Polyfill for navigator.clipboard to prevent errors in third-party scripts
+                if (typeof navigator !== 'undefined' && !navigator.clipboard) {
+                  navigator.clipboard = {
+                    writeText: function(text) {
+                      return new Promise(function(resolve, reject) {
+                        try {
+                          // Fallback to execCommand if clipboard API not available
+                          var textarea = document.createElement('textarea');
+                          textarea.value = text;
+                          textarea.style.position = 'fixed';
+                          textarea.style.left = '-999999px';
+                          document.body.appendChild(textarea);
+                          textarea.select();
+                          var success = document.execCommand('copy');
+                          document.body.removeChild(textarea);
+                          if (success) {
+                            resolve();
+                          } else {
+                            reject(new Error('Failed to copy text'));
+                          }
+                        } catch (err) {
+                          reject(err);
+                        }
+                      });
+                    },
+                    readText: function() {
+                      return Promise.reject(new Error('readText not supported'));
+                    }
+                  };
+                }
+              `,
+            }}
+          />
+        </head>
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
           suppressHydrationWarning

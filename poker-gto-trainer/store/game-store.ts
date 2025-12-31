@@ -71,6 +71,12 @@ type GameState = {
   solverTree: SolverTree; // Solver tree for opponent decisions
   useSolverEngine: boolean; // Whether to use solver-driven opponent AI
   
+  // Training features (opt-in, never blocks input)
+  customRange: Set<string>; // Selected hands for training (e.g., "AKo", "76s")
+  useCustomRange: boolean; // Whether to use custom range for training feedback
+  isPausedForReview: boolean; // Whether game is paused waiting for Continue button
+  showEVPanel: boolean; // Whether to show EV panel
+  
   // Actions
   setNumPlayers: (count: number) => void;
   setRandomPlayers: (random: boolean) => void;
@@ -85,6 +91,17 @@ type GameState = {
   resetGame: () => void;
   loadOpponentStats: (jsonData: string) => void;
   currentHandId: string | null; // Track current hand for data collection
+  // Training features (opt-in, never blocks input)
+  customRange: Set<string>; // Selected hands for training (e.g., "AKo", "76s")
+  useCustomRange: boolean; // Whether to use custom range for training feedback
+  isPausedForReview: boolean; // Whether game is paused waiting for Continue button
+  showEVPanel: boolean; // Whether to show EV panel
+  // Training feature actions
+  toggleHandInRange: (hand: string) => void;
+  setUseCustomRange: (enabled: boolean) => void;
+  setShowEVPanel: (show: boolean) => void;
+  setPausedForReview: (paused: boolean) => void;
+  userClickedContinue: () => void;
 };
 
 const INITIAL_BIG_BLIND = 2;
@@ -147,6 +164,11 @@ export const useGameStore = create<GameState>((set) => ({
   currentHandId: null,
   solverTree: createDefaultSolverTree(),
   useSolverEngine: true, // Enable solver-driven opponent AI by default
+  // Training features initial state
+  customRange: new Set<string>(),
+  useCustomRange: false,
+  isPausedForReview: false,
+  showEVPanel: false,
 
   // Set number of players (minimum 2 to ensure at least one opponent)
   setNumPlayers: (count: number) => {
@@ -444,6 +466,7 @@ export const useGameStore = create<GameState>((set) => ({
       betSizeBB: null,
       betSizeAnalysis: null,
       postFlopBetSizeAnalysis: null,
+      isPausedForReview: false, // CRITICAL: Unpause on new hand
     });
   },
 
@@ -725,6 +748,7 @@ export const useGameStore = create<GameState>((set) => ({
         betSizeAnalysis: (action === "raise" && finalBetSize) ? state.betSizeAnalysis : null,
         postFlopBetSizeAnalysis: null, // Clear post-flop bet sizing on preflop action
         betSizeBB: (action === "raise" && finalBetSize) ? finalBetSize : null, // Only keep betSizeBB if action was raise
+        isPausedForReview: true, // CRITICAL: Pause for review - user must click Continue
       });
 
       // CRITICAL: Do NOT auto-advance - user controls progression via Continue button
@@ -880,6 +904,7 @@ export const useGameStore = create<GameState>((set) => ({
         betSizeAnalysis: null, // Clear preflop bet sizing on post-flop action
         postFlopBetSizeAnalysis: ((postFlopAction === "bet" || postFlopAction === "raise") && finalBetSize) ? state.postFlopBetSizeAnalysis : null,
         betSizeBB: ((postFlopAction === "bet" || postFlopAction === "raise") && finalBetSize) ? finalBetSize : null, // Only keep betSizeBB if action was bet/raise
+        isPausedForReview: true, // CRITICAL: Pause for review - user must click Continue
       });
 
       // CRITICAL: Do NOT auto-advance - user controls progression via Continue button
@@ -1194,6 +1219,7 @@ export const useGameStore = create<GameState>((set) => ({
       lastAction: null,
       feedback: null,
       evLoss: 0,
+      isPausedForReview: false, // CRITICAL: Unpause when advancing street
       // Don't close feedback modal if it's open - let user close it manually
       // showFeedbackModal: state.showFeedbackModal, // Keep current state
     });
@@ -1341,6 +1367,36 @@ export const useGameStore = create<GameState>((set) => ({
   loadOpponentStats: (jsonData: string) => {
     const stats = loadOpponentStats(jsonData);
     set({ opponentStats: stats });
+  },
+  
+  // Training feature actions (opt-in, never blocks input)
+  toggleHandInRange: (hand: string) => {
+    const state = useGameStore.getState();
+    const newRange = new Set(state.customRange);
+    if (newRange.has(hand)) {
+      newRange.delete(hand);
+    } else {
+      newRange.add(hand);
+    }
+    set({ customRange: newRange });
+  },
+  
+  setUseCustomRange: (enabled: boolean) => {
+    set({ useCustomRange: enabled });
+  },
+  
+  setShowEVPanel: (show: boolean) => {
+    set({ showEVPanel: show });
+  },
+  
+  setPausedForReview: (paused: boolean) => {
+    set({ isPausedForReview: paused });
+  },
+  
+  userClickedContinue: () => {
+    const state = useGameStore.getState();
+    // Unpause and allow progression
+    set({ isPausedForReview: false });
   },
 }));
 

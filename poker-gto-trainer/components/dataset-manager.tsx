@@ -176,9 +176,32 @@ export function DatasetManager() {
                   Download File
                 </Button>
                 <Button
-                  onClick={() => {
-                    navigator.clipboard.writeText(exportData);
-                    alert("Copied to clipboard!");
+                  onClick={async () => {
+                    try {
+                      // Check if clipboard API is available
+                      if (navigator.clipboard && navigator.clipboard.writeText) {
+                        await navigator.clipboard.writeText(exportData);
+                        alert("Copied to clipboard!");
+                      } else {
+                        // Fallback: use a temporary textarea element
+                        const textarea = document.createElement("textarea");
+                        textarea.value = exportData;
+                        textarea.style.position = "fixed";
+                        textarea.style.left = "-999999px";
+                        document.body.appendChild(textarea);
+                        textarea.select();
+                        try {
+                          document.execCommand("copy");
+                          alert("Copied to clipboard!");
+                        } catch (err) {
+                          alert("Failed to copy. Please select and copy manually.");
+                        }
+                        document.body.removeChild(textarea);
+                      }
+                    } catch (err) {
+                      console.error("Failed to copy to clipboard:", err);
+                      alert("Failed to copy. Please select and copy manually.");
+                    }
                   }}
                   variant="outline"
                   className="border-gray-600 text-gray-300"

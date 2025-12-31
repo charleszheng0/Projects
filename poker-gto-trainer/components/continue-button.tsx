@@ -19,12 +19,15 @@ export function ContinueButton() {
     dealNewHand,
     foldedPlayers,
     playerSeat,
+    isPausedForReview,
+    userClickedContinue,
   } = useGameStore();
   
   const [isProcessing, setIsProcessing] = useState(false);
   
-  // Only show when feedback is available and not player's turn
-  if (isCorrect === null || lastAction === null || isPlayerTurn) {
+  // CRITICAL: Only show when paused for review (explicit user-gated progression)
+  // This gates progression but NEVER blocks action buttons
+  if (!isPausedForReview || isPlayerTurn) {
     return null;
   }
   
@@ -37,6 +40,9 @@ export function ContinueButton() {
     setIsProcessing(true);
     
     try {
+      // CRITICAL: User clicked continue - unpause progression
+      userClickedContinue();
+      
       const currentState = useGameStore.getState();
       
       // If player folded, deal new hand
@@ -52,6 +58,7 @@ export function ContinueButton() {
         lastAction: null,
         feedback: null,
         evLoss: 0,
+        isPausedForReview: false, // Unpause
       });
       
       // Process opponent actions
@@ -67,6 +74,7 @@ export function ContinueButton() {
           isCorrect: null,
           lastAction: null,
           feedback: null,
+          isPausedForReview: false, // Unpause
         });
         setIsProcessing(false);
         return;

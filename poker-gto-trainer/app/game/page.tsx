@@ -12,6 +12,8 @@ import { GTOSidebar } from "@/components/gto-sidebar";
 import { Navigation } from "@/components/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { RangeSelector } from "@/components/range-selector";
+import { EVPanel } from "@/components/ev-panel";
 
 export default function GamePage() {
   const { 
@@ -41,6 +43,8 @@ export default function GamePage() {
               <Navigation />
             </div>
             <div className="flex items-center gap-4">
+              <RangeSelector />
+              <EVPanel />
               <PlayerCountSelector />
               <Button
                 onClick={dealNewHand}

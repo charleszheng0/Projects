@@ -66,7 +66,8 @@ export function ActionButtonsWithFrequencies() {
     playerStackBB,
     playerPosition,
     numPlayers,
-    selectAction, 
+    selectAction,
+    confirmBetSize,
     optimalActions, 
     isCorrect,
     lastAction,
@@ -347,10 +348,21 @@ export function ActionButtonsWithFrequencies() {
       // Direct actions - no bet sizing needed
       selectAction(frequency.action);
     } else if (frequency.action === "bet" || frequency.action === "raise") {
-      // Bet/raise actions - always open bet sizing modal
-      // The modal will handle validation and confirmation
-      selectAction(frequency.action);
-      // If betSize is provided, it will be used as default in the modal
+      // Bet/raise actions - if betSize is provided, use it directly (like fold/call)
+      // Otherwise, open bet sizing modal
+      if (frequency.betSize && frequency.betSize > 0) {
+        // Use solver-provided bet size directly
+        // Set pendingAction first without opening modal, then confirm bet size
+        useGameStore.setState({ 
+          pendingAction: frequency.action as Action,
+          showBetSizingModal: false // Ensure modal is closed
+        });
+        // Now confirmBetSize will work because pendingAction is set
+        confirmBetSize(frequency.betSize);
+      } else {
+        // No bet size provided - open modal for user input
+        selectAction(frequency.action);
+      }
     }
   };
 
@@ -373,13 +385,10 @@ export function ActionButtonsWithFrequencies() {
         ? (isCorrect ? " bg-green-600 border-green-500 shadow-lg shadow-green-500/50" : " bg-green-600 border-red-500 shadow-lg shadow-red-500/50")
         : " bg-green-600 hover:bg-green-700 border-green-700");
     } else if (frequency.action === "bet" || frequency.action === "raise") {
-      const redShade = frequency.betSize && frequency.betSize > pot * 1.2 ? "bg-red-900" :
-                       frequency.betSize && frequency.betSize > pot * 0.8 ? "bg-red-800" :
-                       frequency.betSize && frequency.betSize > pot * 0.5 ? "bg-red-700" :
-                       "bg-red-600";
-      return baseClass + morphClass + redShade + (isSelected
-        ? (isCorrect ? " border-green-500 shadow-lg shadow-green-500/50" : " border-red-500 shadow-lg shadow-red-500/50")
-        : " hover:brightness-110 border-red-800");
+      // All bet/raise buttons are red with hover effect similar to fold/check
+      return baseClass + morphClass + (isSelected
+        ? (isCorrect ? " bg-red-600 border-green-500 shadow-lg shadow-green-500/50" : " bg-red-600 border-red-500 shadow-lg shadow-red-500/50")
+        : " bg-red-600 hover:bg-red-700 border-red-700");
     }
     return baseClass + morphClass + "bg-gray-700 border-gray-600";
   };
