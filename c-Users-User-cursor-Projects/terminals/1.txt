@@ -2,8 +2,9 @@
 pid: 6796
 cwd: |
   C:\Users\User\.cursor\Projects\poker-gto-trainer
-last_command: npm run dev
-last_exit_code: 1
+active_command: npm start
+last_command: npm run build
+last_exit_code: 0
 ---
 PS C:\Users\User\.cursor\Projects> cd poker-gto-trainer
 PS C:\Users\User\.cursor\Projects\poker-gto-trainer> npm run dev
@@ -18,4 +19,106 @@ PS C:\Users\User\.cursor\Projects\poker-gto-trainer> npm run dev
 
 ✓ Starting...
 ✓ Ready in 2.4s
-PS C:\Users\User\.cursor\Projects\poker-gto-trainer>
+PS C:\Users\User\.cursor\Projects\poker-gto-trainer> 
+                                                     npm run dev
+
+> poker-gto-trainer@0.1.0 dev
+> cross-env NEXT_TELEMETRY_DISABLED=1 next dev
+
+▲ Next.js 16.1.1 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.22:3000
+- Environments: .env.local
+
+✓ Starting...
+✓ Ready in 1397ms
+ GET / 200 in 2.4s (compile: 935ms, proxy.ts: 1230ms, render: 276ms)
+ POST / 200 in 78ms (compile: 7ms, proxy.ts: 20ms, render: 51ms)
+ GET /game 200 in 168ms (compile: 129ms, proxy.ts: 19ms, render: 20ms)
+ GET /analytics 200 in 101ms (compile: 64ms, proxy.ts: 16ms, render: 22ms)
+ GET /game 200 in 34ms (compile: 4ms, proxy.ts: 13ms, render: 16ms)
+ GET /analytics 200 in 35ms (compile: 5ms, proxy.ts: 14ms, render: 16ms)
+ GET /ranges 200 in 99ms (compile: 57ms, proxy.ts: 19ms, render: 23ms)
+ GET /simulator 200 in 113ms (compile: 78ms, proxy.ts: 12ms, render: 24ms)
+ GET /dataset 200 in 127ms (compile: 70ms, proxy.ts: 24ms, render: 32ms)
+ GET /game 200 in 40ms (compile: 5ms, proxy.ts: 20ms, render: 16ms)
+ GET /ranges 200 in 36ms (compile: 4ms, proxy.ts: 15ms, render: 17ms)
+ GET /simulator 200 in 48ms (compile: 5ms, proxy.ts: 22ms, render: 21ms)
+ GET /dataset 200 in 42ms (compile: 4ms, proxy.ts: 22ms, render: 16ms)
+ GET /game 200 in 35ms (compile: 5ms, proxy.ts: 14ms, render: 16ms)
+PS C:\Users\User\.cursor\Projects\poker-gto-trainer> 
+                                                     npm run build
+
+> poker-gto-trainer@0.1.0 build
+> cross-env NEXT_TELEMETRY_DISABLED=1 next build
+
+▲ Next.js 16.1.1 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 4.5s
+✓ Finished TypeScript in 6.3s
+  Collecting page data using 7 workers  ...Error: Missing Supabase environment variables
+    at instantiateModule (C:\Users\User\.cursor\Projects\poker-gto-trainer\.next\server\chunks\[turbopack]_runtime.js:740:9)
+    at getOrInstantiateModuleFromParent (C:\Users\User\.cursor\Projects\poker-gto-trainer\.next\server\chunks\[turbopack]_runtime.js:763:12)
+    at Context.esmImport [as i] (C:\Users\User\.cursor\Projects\poker-gto-trainer\.next\server\chunks\[turbopack]_runtime.js:228:20)
+    at module evaluation (C:\Users\User\.cursor\Projects\poker-gto-trainer\.next\server\chunks\[root-of-the-server]__b1301175._.js:1:10533)
+    at instantiateModule (C:\Users\User\.cursor\Projects\poker-gto-trainer\.next\server\chunks\[turbopack]_runtime.js:740:9)
+    at instantiateRuntimeModule (C:\Users\User\.cursor\Projects\poker-gto-trainer\.next\server\chunks\[turbopack]_runtime.js:768:12)
+    at getOrInstantiateRuntimeModule (C:\Users\User\.cursor\Projects\poker-gto-trainer\.next\server\chunks\[turbopack]_runtime.js:781:12)
+    at Object.m (C:\Users\User\.cursor\Projects\poker-gto-trainer\.next\server\chunks\[turbopack]_runtime.js:790:18) 
+    at Object.<anonymous> (C:\Users\User\.cursor\Projects\poker-gto-trainer\.next\server\app\api\sessions\list\route.js:8:3)
+
+> Build error occurred
+Error: Failed to collect page data for /api/sessions/list
+    at ignore-listed frames {
+  type: 'Error'
+}
+PS C:\Users\User\.cursor\Projects\poker-gto-trainer> ^C  
+PS C:\Users\User\.cursor\Projects\poker-gto-trainer> npm run build
+
+> poker-gto-trainer@0.1.0 build
+> cross-env NEXT_TELEMETRY_DISABLED=1 next build
+
+▲ Next.js 16.1.1 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 4.0s
+✓ Finished TypeScript in 5.3s
+✓ Collecting page data using 7 workers in 1308.6ms
+✓ Generating static pages using 7 workers (14/14) in 322.5ms
+✓ Finalizing page optimization in 8.3ms
+
+Route (app)
+┌ ƒ /
+├ ƒ /_not-found
+├ ƒ /analytics
+├ ƒ /api/hands/deal
+├ ƒ /api/hands/save
+├ ƒ /api/sessions/create
+├ ƒ /api/sessions/list
+├ ƒ /api/sync-user
+├ ƒ /dataset
+├ ƒ /game
+├ ƒ /ranges
+├ ƒ /sign-in/[[...sign-in]]
+├ ƒ /sign-up/[[...sign-up]]
+└ ƒ /simulator
+
+
+ƒ Proxy (Middleware)
+
+ƒ  (Dynamic)  server-rendered on demand
+
+PS C:\Users\User\.cursor\Projects\poker-gto-trainer> npm start
+
+> poker-gto-trainer@0.1.0 start
+> next start
+
+▲ Next.js 16.1.1
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.22:3000
+
+✓ Starting...
+✓ Ready in 956ms
