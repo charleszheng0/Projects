@@ -143,9 +143,10 @@ export function getRealisticFrequencies(
   gameStage: GameStage,
   pot: number,
   currentBet: number,
-  actionToFace: "bet" | "raise" | "check" | null,
+  actionToFace: BettingAction | null,
   optimalActions: (Action | BettingAction)[],
-  numPlayers: number = 6
+  numPlayers: number = 6,
+  playerStackBB?: number
 ): ActionFrequency[] {
   const handString = formatHand(hand);
   const isPreflop = gameStage === "preflop";

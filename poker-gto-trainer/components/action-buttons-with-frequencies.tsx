@@ -50,7 +50,8 @@ export function ActionButtonsWithFrequencies() {
         currentBet,
         actionToFace,
         optimalActions as Action[],
-        numPlayers
+        numPlayers,
+        playerStackBB
       )
     : [];
 
