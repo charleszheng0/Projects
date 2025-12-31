@@ -1,11 +1,27 @@
+"use client";
+
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { Navigation } from "@/components/navigation";
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-center py-32 px-16">
-        <div className="flex flex-col items-center gap-6 text-center">
+    <div className="flex min-h-screen flex-col bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+      {/* Top Bar with Navigation */}
+      <div className="bg-[#0f0f0f] border-b border-gray-800 sticky top-0 z-40">
+        <div className="max-w-[1920px] mx-auto px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-6">
+              <h1 className="text-xl font-bold text-white">Poker GTO Trainer</h1>
+              <Navigation />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <main className="flex-1 flex items-center justify-center py-32 px-16">
+        <div className="flex flex-col items-center gap-6 text-center max-w-3xl">
           <h1 className="text-5xl font-bold leading-tight tracking-tight text-white">
             Poker GTO Trainer
           </h1>

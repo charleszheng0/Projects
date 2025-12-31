@@ -12,6 +12,7 @@ import { generateUniqueHands } from "@/lib/hand-generation";
 import { getSessionManager } from "@/lib/session-tracking";
 import { PlayerProfileType, getRandomProfile, getProfileStats, PLAYER_PROFILES } from "@/lib/player-profiles";
 import { calculateEVLoss } from "@/lib/ev-calculator";
+import { roundBB } from "@/lib/utils";
 
 type GameState = {
   // Hand state
@@ -60,6 +61,7 @@ type GameState = {
   opponentProfiles: Map<number, PlayerProfileType>; // Map seat -> profile type
   cumulativeEV: number; // Track cumulative EV across hands (for session stats)
   handEV: number; // Track EV for current hand only
+  evLoss: number; // EV loss for the last action (for correctness level determination)
   
   // Actions
   setNumPlayers: (count: number) => void;
@@ -82,10 +84,12 @@ const INITIAL_POT = 0;
 const INITIAL_BET = 0;
 
 // Generate random stack sizes in BBs (between 20 and 200 BBs)
+// Returns clean integer values to avoid floating point precision issues
 function generateRandomStacks(numPlayers: number): number[] {
-  return Array.from({ length: numPlayers }, () => 
-    Math.floor(Math.random() * 180) + 20 // 20-200 BBs
-  );
+  return Array.from({ length: numPlayers }, () => {
+    // Generate integer stack sizes to avoid floating point issues
+    return Math.floor(Math.random() * 180) + 20; // 20-200 BBs (integers)
+  });
 }
 
 export const useGameStore = create<GameState>((set) => ({
@@ -131,12 +135,16 @@ export const useGameStore = create<GameState>((set) => ({
   opponentProfiles: new Map<number, PlayerProfileType>() as Map<number, PlayerProfileType>,
   cumulativeEV: 0,
   handEV: 0,
+  evLoss: 0,
   currentHandId: null,
 
-  // Set number of players
+  // Set number of players (minimum 2 to ensure at least one opponent)
   setNumPlayers: (count: number) => {
     if (count >= 2 && count <= 9) {
       set({ numPlayers: count, isRandomPlayers: false });
+    } else if (count < 2) {
+      // Ensure minimum of 2 players
+      set({ numPlayers: 2, isRandomPlayers: false });
     }
   },
 
@@ -149,9 +157,10 @@ export const useGameStore = create<GameState>((set) => ({
   dealNewHand: () => {
     const state = useGameStore.getState();
     // Use random player count if random mode is enabled, otherwise use selected count
+    // Ensure minimum of 2 players (at least one opponent)
     const numPlayers = state.isRandomPlayers 
-      ? Math.floor(Math.random() * 8) + 2 // 2-9 players
-      : state.numPlayers;
+      ? Math.max(2, Math.floor(Math.random() * 8) + 2) // 2-9 players, minimum 2
+      : Math.max(2, state.numPlayers); // Ensure at least 2 players
     const playerSeat = Math.floor(Math.random() * numPlayers);
     const playerPosition = getPositionFromSeat(playerSeat, numPlayers);
     
@@ -181,8 +190,9 @@ export const useGameStore = create<GameState>((set) => ({
     playerBetsBB[bigBlindSeat] = 1; // Big blind
     
     // Reduce stacks for blinds (chips go into pot)
-    playerStacksBB[smallBlindSeat] = Math.max(0, playerStacksBB[smallBlindSeat] - 0.5);
-    playerStacksBB[bigBlindSeat] = Math.max(0, playerStacksBB[bigBlindSeat] - 1);
+    // Round to avoid floating point precision issues
+    playerStacksBB[smallBlindSeat] = Math.max(0, roundBB(playerStacksBB[smallBlindSeat] - 0.5));
+    playerStacksBB[bigBlindSeat] = Math.max(0, roundBB(playerStacksBB[bigBlindSeat] - 1));
     
     // Calculate initial pot (blinds)
     const initialPot = 1.5; // SB + BB
@@ -310,9 +320,9 @@ export const useGameStore = create<GameState>((set) => ({
         finalBets[actingSeat] = raiseSize;
         finalCurrentBet = raiseSize;
         // Reduce opponent's stack by the additional amount they're betting
-        playerStacksBB[actingSeat] = Math.max(0, playerStacksBB[actingSeat] - additionalAmount);
+        playerStacksBB[actingSeat] = Math.max(0, roundBB(playerStacksBB[actingSeat] - additionalAmount));
         // Add the additional amount to pot (raiseSize - previousBet)
-        finalPot += additionalAmount;
+        finalPot = roundBB(finalPot + additionalAmount);
         finalActionToFace = "call";
         seatsThatHaveActed.add(actingSeat);
         // More raises = harder decisions for player
@@ -323,9 +333,9 @@ export const useGameStore = create<GameState>((set) => ({
         const additionalAmount = callAmount - previousBetAmount;
         finalBets[actingSeat] = callAmount;
         // Reduce opponent's stack by the additional amount they're calling
-        playerStacksBB[actingSeat] = Math.max(0, playerStacksBB[actingSeat] - additionalAmount);
+        playerStacksBB[actingSeat] = Math.max(0, roundBB(playerStacksBB[actingSeat] - additionalAmount));
         // Add the additional amount to pot (callAmount - previousBetAmount)
-        finalPot += additionalAmount;
+        finalPot = roundBB(finalPot + additionalAmount);
         if (!finalActionToFace && callAmount > INITIAL_BIG_BLIND) {
           finalActionToFace = "call";
         }
@@ -413,6 +423,7 @@ export const useGameStore = create<GameState>((set) => ({
       opponentProfiles: newProfiles, // Assign profiles to opponents
       currentHandId: handId, // Track current hand
       handEV: 0, // Reset hand EV for new hand
+      evLoss: 0, // Reset EV loss for new hand
       feedback: null,
       isCorrect: null,
       optimalActions: [],
@@ -561,17 +572,35 @@ export const useGameStore = create<GameState>((set) => ({
         optimalActions: result.optimalActions,
         explanation,
         postFlopExplanation: null, // Clear post-flop explanation on preflop action
-        showFeedbackModal: true,
+        showFeedbackModal: false, // Don't show modal - feedback is integrated into buttons
         isPlayerTurn: false,
         playerBetsBB: updatedBets,
         lastActorSeat: state.playerSeat, // Track who just acted
         actionHistory: newActionHistory,
         handEV: newHandEV, // Track EV for this hand
+        evLoss: evLoss, // Store EV loss for this action
         // Only keep bet sizing analysis if action was actually a raise
         betSizeAnalysis: (action === "raise" && betSizeBB) ? state.betSizeAnalysis : null,
         postFlopBetSizeAnalysis: null, // Clear post-flop bet sizing on preflop action
         betSizeBB: (action === "raise" && betSizeBB) ? betSizeBB : null, // Only keep betSizeBB if action was raise
       });
+
+      // Auto-advance after showing feedback (2 seconds delay for user to see feedback)
+      setTimeout(() => {
+        const currentState = useGameStore.getState();
+        const actionToUse = currentState.isCorrect === false && currentState.optimalActions.length > 0 
+          ? currentState.optimalActions[0] // Use first optimal action if user was wrong
+          : currentState.lastAction; // Use actual action if correct
+        
+        const action = actionToUse as Action;
+        if (action !== "fold") {
+          // Hand continues - advance to flop
+          useGameStore.getState().advanceToNextStreet();
+        } else {
+          // Player folded - deal new hand
+          useGameStore.getState().dealNewHand();
+        }
+      }, 2000); // 2 second delay to see feedback
 
       // Record action in dataset
       if (state.currentHandId) {
@@ -635,12 +664,12 @@ export const useGameStore = create<GameState>((set) => ({
         // Call the current bet
         const callAmount = state.currentBet;
         updatedBets[state.playerSeat] = callAmount;
-        newPot += callAmount - previousBet; // Add the additional amount to pot
+        newPot = roundBB(newPot + (callAmount - previousBet)); // Add the additional amount to pot
       } else if (postFlopAction === "bet" || (postFlopAction === "raise" && betSizeBB)) {
         // Bet or raise
         const betAmount = betSizeBB || state.currentBet;
         updatedBets[state.playerSeat] = betAmount;
-        newPot += betAmount - previousBet; // Add the additional amount to pot
+        newPot = roundBB(newPot + (betAmount - previousBet)); // Add the additional amount to pot
         set({ currentBet: betAmount });
       } else if (postFlopAction === "check") {
         // Check - no bet change
@@ -653,6 +682,27 @@ export const useGameStore = create<GameState>((set) => ({
         set({ foldedPlayers: updatedFolded });
       }
       
+      // Calculate EV loss for this action
+      let evLoss = 0;
+      try {
+        evLoss = calculateEVLoss(
+          state.playerHand,
+          state.communityCards,
+          state.gameStage,
+          state.pot,
+          state.currentBet,
+          postFlopAction as string,
+          result.optimalActions,
+          betSizeBB,
+          state.numPlayers
+        );
+      } catch (error) {
+        // EV calculation failed, continue without it
+      }
+
+      // Update hand EV (accumulate, but reset per hand in dealNewHand)
+      const newHandEV = state.handEV + evLoss;
+
       // Add to action history
       const newActionHistory = [
         ...state.actionHistory,
@@ -671,16 +721,45 @@ export const useGameStore = create<GameState>((set) => ({
         explanation: null, // Clear preflop explanation on post-flop action
         postFlopExplanation,
         isPlayerTurn: false,
-        showFeedbackModal: true,
+        showFeedbackModal: false, // Don't show modal - feedback is integrated into buttons
         playerBetsBB: updatedBets,
         pot: newPot, // Update pot with new bet amounts
         lastActorSeat: state.playerSeat, // Track who just acted
         actionHistory: newActionHistory,
+        handEV: newHandEV, // Track EV for this hand
+        evLoss: evLoss, // Store EV loss for this action
         // Only keep bet sizing analysis if action was actually a bet or raise
         betSizeAnalysis: null, // Clear preflop bet sizing on post-flop action
         postFlopBetSizeAnalysis: ((postFlopAction === "bet" || postFlopAction === "raise") && betSizeBB) ? state.postFlopBetSizeAnalysis : null,
         betSizeBB: ((postFlopAction === "bet" || postFlopAction === "raise") && betSizeBB) ? betSizeBB : null, // Only keep betSizeBB if action was bet/raise
       });
+
+      // Auto-advance after showing feedback (2 seconds delay for user to see feedback)
+      setTimeout(() => {
+        const currentState = useGameStore.getState();
+        const actionToUse = currentState.isCorrect === false && currentState.optimalActions.length > 0 
+          ? currentState.optimalActions[0] // Use first optimal action if user was wrong
+          : currentState.lastAction; // Use actual action if correct
+        
+        const postFlopActionToUse = actionToUse as BettingAction;
+        if (postFlopActionToUse === "fold") {
+          // Player folded - deal new hand
+          useGameStore.getState().dealNewHand();
+        } else {
+          // Continue hand - process opponent actions and advance street if needed
+          const activeOpponents = currentState.foldedPlayers
+            .map((folded, seat) => !folded && seat !== currentState.playerSeat ? seat : null)
+            .filter((seat): seat is number => seat !== null);
+          
+          if (activeOpponents.length > 0) {
+            // Simulate opponent actions
+            useGameStore.getState().processOpponentActions();
+          } else {
+            // No active opponents, advance to next street
+            useGameStore.getState().advanceToNextStreet();
+          }
+        }
+      }, 2000); // 2 second delay to see feedback
 
       // Record action in dataset
       if (state.currentHandId) {
@@ -727,21 +806,24 @@ export const useGameStore = create<GameState>((set) => ({
     const state = useGameStore.getState();
     if (state.gameStage === "preflop") return;
     
-    // This function is kept for backwards compatibility but logic is handled in closeFeedbackModal
-    // After player acts, simulate opponent responses and then advance to next street
+    // After player acts, simulate opponent responses and then advance to next street if betting round completes
     const activeOpponents = state.foldedPlayers
       .map((folded, seat) => !folded && seat !== state.playerSeat ? seat : null)
       .filter((seat): seat is number => seat !== null);
     
     if (activeOpponents.length === 0) {
-      state.advanceToNextStreet();
+      // No active opponents, advance to next street
+      setTimeout(() => {
+        useGameStore.getState().advanceToNextStreet();
+      }, 500);
       return;
     }
     
+    // Process first active opponent
     const opponentSeat = activeOpponents[0];
     
-    // Generate opponent hand for simulation
-    const opponentHand: Hand = {
+    // Use opponent's actual hand if available
+    const opponentHand = state.opponentHands[opponentSeat] || {
       card1: { rank: ["2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K", "A"][Math.floor(Math.random() * 13)], suit: ["hearts", "diamonds", "clubs", "spades"][Math.floor(Math.random() * 4)] },
       card2: { rank: ["2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K", "A"][Math.floor(Math.random() * 13)], suit: ["hearts", "diamonds", "clubs", "spades"][Math.floor(Math.random() * 4)] },
     };
@@ -760,6 +842,32 @@ export const useGameStore = create<GameState>((set) => ({
       profileStats
     );
     
+    const currentBetAmount = state.currentBet || 0;
+    
+    // Handle opponent fold
+    if (opponentAction?.action === "fold" && opponentSeat !== null) {
+      const updatedFolded = [...state.foldedPlayers];
+      updatedFolded[opponentSeat] = true;
+      set({ foldedPlayers: updatedFolded });
+      
+      // Check if any active opponents remain
+      const remainingActive = updatedFolded.filter((folded, seat) => !folded && seat !== state.playerSeat).length;
+      if (remainingActive === 0) {
+        // Player wins, deal new hand
+        setTimeout(() => {
+          useGameStore.getState().dealNewHand();
+        }, 1000);
+        return;
+      }
+      
+      // Continue betting round - advance to next street
+      setTimeout(() => {
+        useGameStore.getState().advanceToNextStreet();
+      }, 800);
+      return;
+    }
+    
+    // Handle opponent bet - player must respond
     if (opponentAction?.action === "bet" && opponentSeat !== null) {
       const betSize = opponentAction.betSizeBB || Math.max(1, Math.round(state.pot * 0.5 * 10) / 10);
       const updatedBets = [...state.playerBetsBB];
@@ -768,16 +876,57 @@ export const useGameStore = create<GameState>((set) => ({
       set({
         actionToFace: "bet",
         isPlayerTurn: true,
-        pot: state.pot + betSize,
+        pot: roundBB(state.pot + betSize),
         currentBet: betSize,
         playerBetsBB: updatedBets,
         lastActorSeat: opponentSeat,
+        // Reset feedback state for new action
+        isCorrect: null,
+        lastAction: null,
+        feedback: null,
+        evLoss: 0,
       });
-    } else {
-      setTimeout(() => {
-        state.advanceToNextStreet();
-      }, 500);
+      return;
     }
+    
+    // Handle opponent raise - player must respond
+    if (opponentAction?.action === "raise" && opponentSeat !== null) {
+      const raiseSize = opponentAction.betSizeBB || Math.max(currentBetAmount * 2, Math.round(state.pot * 0.67 * 10) / 10);
+      const updatedBets = [...state.playerBetsBB];
+      updatedBets[opponentSeat] = raiseSize;
+      
+      set({
+        actionToFace: "raise",
+        isPlayerTurn: true,
+        pot: roundBB(state.pot + raiseSize),
+        currentBet: raiseSize,
+        playerBetsBB: updatedBets,
+        lastActorSeat: opponentSeat,
+        // Reset feedback state for new action
+        isCorrect: null,
+        lastAction: null,
+        feedback: null,
+        evLoss: 0,
+      });
+      return;
+    }
+    
+    // Handle opponent call/check - betting round completes, advance to next street
+    if (opponentAction?.action === "call" && opponentSeat !== null) {
+      const callAmount = currentBetAmount || 0;
+      const updatedBets = [...state.playerBetsBB];
+      updatedBets[opponentSeat] = callAmount;
+      set({
+        pot: roundBB(state.pot + callAmount),
+        playerBetsBB: updatedBets,
+        lastActorSeat: opponentSeat,
+      });
+    }
+    
+    // Betting round completes - advance to next street
+    setTimeout(() => {
+      useGameStore.getState().advanceToNextStreet();
+    }, 800);
   },
 
   // Advance to next street
@@ -832,6 +981,11 @@ export const useGameStore = create<GameState>((set) => ({
       currentBet: 0,
       playerBetsBB: resetBets,
       lastActorSeat: null, // Reset last actor for new street
+      // Reset feedback state for new action
+      isCorrect: null,
+      lastAction: null,
+      feedback: null,
+      evLoss: 0,
       // Don't close feedback modal if it's open - let user close it manually
       // showFeedbackModal: state.showFeedbackModal, // Keep current state
     });
@@ -888,10 +1042,15 @@ export const useGameStore = create<GameState>((set) => ({
           useGameStore.setState({
             actionToFace: "bet",
             isPlayerTurn: true,
-            pot: currentState.pot + betSize,
+            pot: roundBB(currentState.pot + betSize),
             currentBet: betSize,
             playerBetsBB: updatedBets, // Show opponent's bet visually
             lastActorSeat: opponentSeat,
+            // Reset feedback state for new action
+            isCorrect: null,
+            lastAction: null,
+            feedback: null,
+            evLoss: 0,
           });
         } else if (opponentAction?.action === "fold" && opponentSeat !== null) {
           // Opponent folds on new street
@@ -901,12 +1060,22 @@ export const useGameStore = create<GameState>((set) => ({
             foldedPlayers: updatedFolded,
             actionToFace: "check",
             isPlayerTurn: true,
+            // Reset feedback state for new action
+            isCorrect: null,
+            lastAction: null,
+            feedback: null,
+            evLoss: 0,
           });
         } else {
           // Opponent checks, player can act
           useGameStore.setState({
             actionToFace: "check",
             isPlayerTurn: true,
+            // Reset feedback state for new action
+            isCorrect: null,
+            lastAction: null,
+            feedback: null,
+            evLoss: 0,
           });
         }
       }, 1000);
@@ -1029,10 +1198,15 @@ export const useGameStore = create<GameState>((set) => ({
               useGameStore.setState({
                 actionToFace: "bet",
                 isPlayerTurn: true,
-                pot: currentState.pot + betSize,
+                pot: roundBB(currentState.pot + betSize),
                 currentBet: betSize,
                 playerBetsBB: updatedBets,
                 lastActorSeat: opponentSeat,
+                // Reset feedback state for new action
+                isCorrect: null,
+                lastAction: null,
+                feedback: null,
+                evLoss: 0,
               });
             } else if (opponentAction?.action === "raise" && opponentSeat !== null) {
               // Opponent raises - player must respond
@@ -1043,10 +1217,15 @@ export const useGameStore = create<GameState>((set) => ({
               useGameStore.setState({
                 actionToFace: "raise",
                 isPlayerTurn: true,
-                pot: currentState.pot + raiseSize,
+                pot: roundBB(currentState.pot + raiseSize),
                 currentBet: raiseSize,
                 playerBetsBB: updatedBets,
                 lastActorSeat: opponentSeat,
+                // Reset feedback state for new action
+                isCorrect: null,
+                lastAction: null,
+                feedback: null,
+                evLoss: 0,
               });
             } else {
               // Opponent calls/checks - betting round completes, advance to next street
@@ -1055,7 +1234,7 @@ export const useGameStore = create<GameState>((set) => ({
                 const updatedBets = [...currentState.playerBetsBB];
                 updatedBets[opponentSeat] = callAmount;
                 useGameStore.setState({
-                  pot: currentState.pot + callAmount,
+                  pot: roundBB(currentState.pot + callAmount),
                   playerBetsBB: updatedBets,
                   lastActorSeat: opponentSeat,
                 });
@@ -1116,10 +1295,15 @@ export const useGameStore = create<GameState>((set) => ({
             useGameStore.setState({
               actionToFace: "bet",
               isPlayerTurn: true,
-              pot: currentState.pot + betSize,
+              pot: roundBB(currentState.pot + betSize),
               currentBet: betSize,
               playerBetsBB: updatedBets,
               lastActorSeat: opponentSeat,
+              // Reset feedback state for new action
+              isCorrect: null,
+              lastAction: null,
+              feedback: null,
+              evLoss: 0,
             });
           } else if (opponentAction?.action === "raise" && opponentSeat !== null) {
             // Opponent raises - player must respond
@@ -1130,10 +1314,15 @@ export const useGameStore = create<GameState>((set) => ({
             useGameStore.setState({
               actionToFace: "raise",
               isPlayerTurn: true,
-              pot: currentState.pot + raiseSize,
+              pot: roundBB(currentState.pot + raiseSize),
               currentBet: raiseSize,
               playerBetsBB: updatedBets,
               lastActorSeat: opponentSeat,
+              // Reset feedback state for new action
+              isCorrect: null,
+              lastAction: null,
+              feedback: null,
+              evLoss: 0,
             });
           } else {
             // Opponent calls/checks - betting round completes, advance to next street
@@ -1142,7 +1331,7 @@ export const useGameStore = create<GameState>((set) => ({
               const updatedBets = [...currentState.playerBetsBB];
               updatedBets[opponentSeat] = callAmount;
               useGameStore.setState({
-                pot: currentState.pot + callAmount,
+                pot: roundBB(currentState.pot + callAmount),
                 playerBetsBB: updatedBets,
                 lastActorSeat: opponentSeat,
               });

@@ -7,6 +7,7 @@ import { Badge } from "./ui/badge";
 import { ActionIndicator } from "./action-indicator";
 import { FoldAnimation } from "./fold-animation";
 import { getPositionFromSeat } from "@/lib/gto";
+import { formatBB } from "@/lib/utils";
 
 export function PokerTable() {
   const { 
@@ -85,13 +86,13 @@ export function PokerTable() {
           <div className={`text-white text-2xl font-semibold transition-all duration-200 ${
             potAnimation ? "scale-110" : "scale-100"
           }`}>
-            {pot} bb
+            {formatBB(pot)} bb
           </div>
           
           {/* Current Bet to Call - Subtle below pot */}
           {currentBet > 0 && (
             <div className="text-gray-400 text-sm">
-              {currentBet} bb to call
+              {formatBB(currentBet)} bb to call
             </div>
           )}
 
@@ -134,6 +135,7 @@ export function PokerTable() {
           const betBB = Math.max(0, safePlayerBetsBB[seat] || 0); // Ensure betBB is never negative
           // Display stack minus current bet (chips already committed to pot)
           const stackBB = Math.max(0, (safePlayerStacksBB[seat] || 100) - betBB);
+          const displayStack = formatBB(stackBB);
           const isSmallBlind = seat === smallBlindSeat;
           const isBigBlind = seat === bigBlindSeat;
           const isButton = seat === buttonSeat;
@@ -232,7 +234,7 @@ export function PokerTable() {
                   }`}>
                     <div className="text-white text-[10px] font-semibold">YOU</div>
                     <div className="text-green-400 text-xs font-bold">
-                      {Math.max(0, playerStackBB - (safePlayerBetsBB[playerSeat] || 0))}
+                      {formatBB(Math.max(0, playerStackBB - (safePlayerBetsBB[playerSeat] || 0)))} BB
                     </div>
                     {isFolded && (
                       <div className="absolute -bottom-4 text-red-400 text-[9px] font-bold">FOLD</div>
@@ -265,7 +267,7 @@ export function PokerTable() {
                     <div className={`text-xs font-bold ${
                       isFolded ? "text-gray-600" : "text-gray-400"
                     }`}>
-                      {stackBB}
+                      {displayStack} BB
                     </div>
                     {isFolded && (
                       <div className="absolute -bottom-4 text-red-400 text-[9px] font-bold">FOLD</div>
@@ -289,7 +291,7 @@ export function PokerTable() {
                 {betBB > 0 && !isFolded && (() => {
                   // Ensure at least 1 chip for any bet > 0
                   const chipCount = Math.max(1, Math.min(Math.ceil(betBB / 5), 5));
-                  const displayAmount = Math.round(betBB * 10) / 10; // Round to 1 decimal place
+                  const displayAmount = formatBB(betBB); // Format to avoid floating point issues
                   
                   return (
                     <div className="relative flex flex-col items-center justify-center mt-1 gap-1">

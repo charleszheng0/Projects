@@ -4,41 +4,22 @@ import { useEffect, useState } from "react";
 import { useGameStore } from "@/store/game-store";
 import { PokerTable } from "@/components/poker-table";
 import { ActionButtonsWithFrequencies } from "@/components/action-buttons-with-frequencies";
-import { FeedbackBox } from "@/components/feedback-box";
-import { FeedbackModal } from "@/components/feedback-modal";
 import { BetSizingModal } from "@/components/bet-sizing-modal";
 import { PlayerCountSelector } from "@/components/player-count-selector";
 import { HandHistoryReview } from "@/components/hand-history-review";
-import { RangeVisualizer } from "@/components/range-visualizer";
-import { Navigation } from "@/components/navigation";
-import { TrainingStatsPanel } from "@/components/training-stats-panel";
 import { ActionHistoryBar } from "@/components/action-history-bar";
-import { GTOHints } from "@/components/gto-hints";
+import { GTOSidebar } from "@/components/gto-sidebar";
+import { Navigation } from "@/components/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 
 export default function GamePage() {
   const { 
     dealNewHand, 
-    playerHand, 
     currentHandId,
-    playerPosition,
-    gameStage,
-    numPlayers,
-    playerStackBB,
-    pot,
-    currentBet,
-    isCorrect,
-    lastAction,
-    optimalActions,
-    explanation,
-    postFlopExplanation
   } = useGameStore();
   
   const [showHandReview, setShowHandReview] = useState(false);
-  const [showRangePanel, setShowRangePanel] = useState(false);
-  const [showStatsPanel, setShowStatsPanel] = useState(true);
 
   useEffect(() => {
     // Deal a new hand when component mounts
@@ -46,9 +27,8 @@ export default function GamePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-
   return (
-    <div className="min-h-screen bg-[#0f0f0f]">
+    <div className="min-h-screen bg-[#0f0f0f] flex flex-col">
       {/* Action History Bar - GTO Wizard Style Top Breadcrumb */}
       <ActionHistoryBar />
       
@@ -60,112 +40,62 @@ export default function GamePage() {
               <h1 className="text-xl font-bold text-white">Poker GTO Trainer</h1>
               <Navigation />
             </div>
-            <div className="flex items-center gap-4 mr-20">
+            <div className="flex items-center gap-4">
+              <PlayerCountSelector />
               <Button
-                variant="ghost"
+                onClick={dealNewHand}
+                variant="outline"
                 size="sm"
-                onClick={() => setShowRangePanel(!showRangePanel)}
-                className={`text-gray-300 hover:text-white ${showRangePanel ? 'bg-gray-800' : ''}`}
+                className="bg-gray-800 hover:bg-gray-700 text-white border-gray-600 whitespace-nowrap"
               >
-                {showRangePanel ? 'Hide' : 'Show'} Ranges
+                New Hand
               </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowStatsPanel(!showStatsPanel)}
-                className={`text-gray-300 hover:text-white ${showStatsPanel ? 'bg-gray-800' : ''}`}
-              >
-                {showStatsPanel ? 'Hide' : 'Show'} Stats
-              </Button>
+              {currentHandId && (
+                <Button
+                  onClick={() => setShowHandReview(true)}
+                  variant="outline"
+                  size="sm"
+                  className="bg-gray-800 hover:bg-gray-700 text-white border-gray-600 whitespace-nowrap"
+                >
+                  Review
+                </Button>
+              )}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Main Layout - GTO Wizard Style */}
-      <div className="max-w-[1920px] mx-auto px-4 py-6">
-        <div className="grid grid-cols-12 gap-6">
-          {/* Left Sidebar - Range Visualizer (Collapsible) */}
-          {showRangePanel && (
-            <div className="col-span-12 lg:col-span-3">
-              <Card className="p-4 bg-gray-800/50 border-gray-700 sticky top-20 max-h-[calc(100vh-8rem)] overflow-y-auto">
-                <RangeVisualizer 
-                  position={playerPosition} 
-                  numPlayers={numPlayers}
-                  stackDepth={playerStackBB}
-                />
-              </Card>
-            </div>
-          )}
+      {/* Main Layout - GTO Wizard 3-Panel Structure */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Panel - Controls (Optional, can be hidden) */}
+        <div className="w-0 lg:w-64 border-r border-gray-800 bg-[#1a1a1a] hidden lg:block">
+          {/* Left panel content can go here if needed */}
+        </div>
 
-          {/* Main Training Area */}
-          <div className={`${showRangePanel ? 'col-span-12 lg:col-span-6' : 'col-span-12 lg:col-span-8'}`}>
-            <div className="space-y-6">
-              {/* Game Info Bar */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-4 flex-wrap min-w-0 flex-1">
-                    <PlayerCountSelector />
-                  </div>
-                  <div className="flex gap-2 flex-shrink-0">
-                    <Button
-                      onClick={dealNewHand}
-                      variant="outline"
-                      size="sm"
-                      className="bg-gray-800 hover:bg-gray-700 text-white border-gray-600 whitespace-nowrap"
-                    >
-                      New Hand
-                    </Button>
-                    {currentHandId && (
-                      <Button
-                        onClick={() => setShowHandReview(true)}
-                        variant="outline"
-                        size="sm"
-                        className="bg-gray-800 hover:bg-gray-700 text-white border-gray-600 whitespace-nowrap"
-                      >
-                        Review
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Poker Table - Main Focus */}
+        {/* Center Panel - Poker Table & Action Buttons */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 flex items-center justify-center p-6 overflow-auto">
+            {/* Poker Table - Always visible, never dimmed */}
+            <div className="w-full max-w-4xl">
               <Card className="p-6 bg-gray-800/50 border-gray-700">
                 <PokerTable />
               </Card>
-
-              {/* Action Buttons - GTO Wizard Style with Frequencies */}
-              <Card className="p-4 bg-[#1a1a1a] border-gray-800">
-                <ActionButtonsWithFrequencies />
-              </Card>
-
-              {/* Quick Stats Bar - GTO Wizard Style */}
-              <Card className="p-4 bg-gray-800/50 border-gray-700">
-                <TrainingStatsPanel compact={true} />
-              </Card>
-
-              {/* Feedback & Hints */}
-              <div className="space-y-4">
-                <FeedbackBox />
-                <GTOHints />
-              </div>
             </div>
           </div>
 
-          {/* Right Sidebar - Statistics Panel (Collapsible) */}
-          {showStatsPanel && (
-            <div className="col-span-12 lg:col-span-3">
-              <Card className="p-4 bg-gray-800/50 border-gray-700 sticky top-20 max-h-[calc(100vh-8rem)] overflow-y-auto">
-                <TrainingStatsPanel />
-              </Card>
-            </div>
-          )}
+          {/* Action Buttons - Fixed at bottom, morphs into analysis */}
+          <div className="border-t border-gray-800 bg-[#1a1a1a] p-4">
+            <ActionButtonsWithFrequencies />
+          </div>
+        </div>
+
+        {/* Right Panel - GTO Sidebar (Strategy/Ranges) */}
+        <div className="w-0 lg:w-96 border-l border-gray-800 bg-[#1a1a1a] hidden lg:flex">
+          <GTOSidebar />
         </div>
       </div>
 
       {/* Modals */}
-      <FeedbackModal />
       <BetSizingModal />
 
       {/* Hand History Review Modal */}
@@ -175,7 +105,7 @@ export default function GamePage() {
           onClick={() => setShowHandReview(false)}
         >
           <div 
-            className="w-full max-w-4xl max-h-[90vh] overflow-y-auto"
+            className="w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-gray-900 rounded-lg border border-gray-700"
             onClick={(e) => e.stopPropagation()}
           >
             <HandHistoryReview 
@@ -188,4 +118,3 @@ export default function GamePage() {
     </div>
   );
 }
-
