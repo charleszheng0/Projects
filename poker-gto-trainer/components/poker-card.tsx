@@ -8,6 +8,7 @@ interface PokerCardProps {
   className?: string;
   size?: "sm" | "md" | "lg";
   faceDown?: boolean;
+  style?: React.CSSProperties;
 }
 
 const suitSymbols: Record<string, string> = {
@@ -19,8 +20,8 @@ const suitSymbols: Record<string, string> = {
 
 const suitColors: Record<string, string> = {
   hearts: "text-red-600",
-  diamonds: "text-red-600",
-  clubs: "text-gray-900",
+  diamonds: "text-red-500",
+  clubs: "text-green-700",
   spades: "text-gray-900",
 };
 
@@ -30,17 +31,18 @@ const sizeClasses = {
   lg: "w-20 h-32 text-base",
 };
 
-export function PokerCard({ card, className, size = "md", faceDown = false }: PokerCardProps) {
+export function PokerCard({ card, className, size = "md", faceDown = false, style }: PokerCardProps) {
   if (faceDown) {
     return (
       <div
         className={cn(
-          "rounded-lg border-2 border-gray-800 bg-gradient-to-br from-blue-900 to-blue-700 shadow-lg flex items-center justify-center",
+          "rounded border border-gray-700 bg-[#1a1a1a] flex items-center justify-center",
           sizeClasses[size],
           className
         )}
+        style={style}
       >
-        <div className="text-white text-2xl">🂠</div>
+        <div className="text-gray-600 text-2xl">🂠</div>
       </div>
     );
   }
@@ -52,10 +54,11 @@ export function PokerCard({ card, className, size = "md", faceDown = false }: Po
   return (
     <div
       className={cn(
-        "rounded-lg border-2 border-gray-800 bg-white shadow-lg flex flex-col items-center justify-between relative",
+        "rounded border border-gray-700 bg-white flex flex-col items-center justify-between relative",
         sizeClasses[size],
         className
       )}
+      style={style}
     >
       {/* Top rank */}
       <div className={cn("font-bold absolute top-1 left-1", suitColor, size === "sm" ? "text-xs" : size === "md" ? "text-sm" : "text-base")}>

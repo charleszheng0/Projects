@@ -26,7 +26,7 @@ export function Navigation() {
               size="sm"
               className={
                 isActive
-                  ? "bg-blue-600 hover:bg-blue-700 text-white"
+                  ? "bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/50 font-semibold"
                   : "text-gray-300 hover:text-white hover:bg-gray-800"
               }
             >

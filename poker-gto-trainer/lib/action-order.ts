@@ -22,7 +22,8 @@ export function getActionOrder(numPlayers: number): Position[] {
     return ["SB", "BB"];
   }
   
-  // Standard order: UTG -> UTG+1 -> MP -> CO -> BTN -> SB -> BB
+  // Post-flop order: UTG -> UTG+1 -> MP -> CO -> BTN -> SB -> BB
+  // (First player after button acts first post-flop)
   const positions: Position[] = ["UTG", "UTG+1", "MP", "CO", "BTN", "SB", "BB"];
   return positions.slice(0, numPlayers);
 }

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useGameStore } from "@/store/game-store";
 import { PokerTable } from "@/components/poker-table";
-import { ActionButtons } from "@/components/action-buttons";
+import { ActionButtonsWithFrequencies } from "@/components/action-buttons-with-frequencies";
 import { FeedbackBox } from "@/components/feedback-box";
 import { FeedbackModal } from "@/components/feedback-modal";
 import { BetSizingModal } from "@/components/bet-sizing-modal";
@@ -12,11 +12,11 @@ import { HandHistoryReview } from "@/components/hand-history-review";
 import { RangeVisualizer } from "@/components/range-visualizer";
 import { Navigation } from "@/components/navigation";
 import { TrainingStatsPanel } from "@/components/training-stats-panel";
+import { ActionHistoryBar } from "@/components/action-history-bar";
+import { GTOHints } from "@/components/gto-hints";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { formatHand } from "@/lib/gto";
-import { categorizeHandStrength, getHandStrengthDescription, getStreetNumber, getStreetDescription } from "@/lib/hand-categorization";
 
 export default function GamePage() {
   const { 
@@ -46,22 +46,21 @@ export default function GamePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Get current hand strength category
-  const handStrengthCategory = playerHand ? categorizeHandStrength(playerHand) : null;
-  const streetNumber = getStreetNumber(gameStage);
-  const streetDescription = getStreetDescription(streetNumber);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+    <div className="min-h-screen bg-[#0f0f0f]">
+      {/* Action History Bar - GTO Wizard Style Top Breadcrumb */}
+      <ActionHistoryBar />
+      
       {/* Top Bar - GTO Wizard Style */}
-      <div className="bg-gray-900/95 border-b border-gray-700 sticky top-0 z-40">
+      <div className="bg-[#0f0f0f] border-b border-gray-800 sticky top-0 z-40">
         <div className="max-w-[1920px] mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-6">
               <h1 className="text-xl font-bold text-white">Poker GTO Trainer</h1>
               <Navigation />
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 mr-20">
               <Button
                 variant="ghost"
                 size="sm"
@@ -103,44 +102,31 @@ export default function GamePage() {
           <div className={`${showRangePanel ? 'col-span-12 lg:col-span-6' : 'col-span-12 lg:col-span-8'}`}>
             <div className="space-y-6">
               {/* Game Info Bar */}
-              <div className="flex items-center justify-between flex-wrap gap-4">
-                <div className="flex items-center gap-4 flex-wrap">
-                  <PlayerCountSelector />
-                  {playerHand && (
-                    <>
-                      <Badge variant="outline" className="bg-gray-800 text-white border-gray-600">
-                        Hand: {formatHand(playerHand)}
-                      </Badge>
-                      {handStrengthCategory && (
-                        <Badge variant="outline" className="bg-blue-900/50 text-blue-300 border-blue-600">
-                          {getHandStrengthDescription(handStrengthCategory)}
-                        </Badge>
-                      )}
-                      <Badge variant="outline" className="bg-purple-900/50 text-purple-300 border-purple-600">
-                        {streetDescription}
-                      </Badge>
-                    </>
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    onClick={dealNewHand}
-                    variant="outline"
-                    size="sm"
-                    className="bg-gray-800 hover:bg-gray-700 text-white border-gray-600"
-                  >
-                    New Hand
-                  </Button>
-                  {currentHandId && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-4 flex-wrap min-w-0 flex-1">
+                    <PlayerCountSelector />
+                  </div>
+                  <div className="flex gap-2 flex-shrink-0">
                     <Button
-                      onClick={() => setShowHandReview(true)}
+                      onClick={dealNewHand}
                       variant="outline"
                       size="sm"
-                      className="bg-gray-800 hover:bg-gray-700 text-white border-gray-600"
+                      className="bg-gray-800 hover:bg-gray-700 text-white border-gray-600 whitespace-nowrap"
                     >
-                      Review
+                      New Hand
                     </Button>
-                  )}
+                    {currentHandId && (
+                      <Button
+                        onClick={() => setShowHandReview(true)}
+                        variant="outline"
+                        size="sm"
+                        className="bg-gray-800 hover:bg-gray-700 text-white border-gray-600 whitespace-nowrap"
+                      >
+                        Review
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -149,19 +135,20 @@ export default function GamePage() {
                 <PokerTable />
               </Card>
 
-              {/* Action Buttons - Prominent */}
-              <div className="flex justify-center">
-                <ActionButtons />
-              </div>
+              {/* Action Buttons - GTO Wizard Style with Frequencies */}
+              <Card className="p-4 bg-[#1a1a1a] border-gray-800">
+                <ActionButtonsWithFrequencies />
+              </Card>
 
               {/* Quick Stats Bar - GTO Wizard Style */}
               <Card className="p-4 bg-gray-800/50 border-gray-700">
                 <TrainingStatsPanel compact={true} />
               </Card>
 
-              {/* Feedback Box - Integrated */}
-              <div className="max-w-4xl mx-auto">
+              {/* Feedback & Hints */}
+              <div className="space-y-4">
                 <FeedbackBox />
+                <GTOHints />
               </div>
             </div>
           </div>

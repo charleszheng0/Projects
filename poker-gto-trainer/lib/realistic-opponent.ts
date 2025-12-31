@@ -42,35 +42,37 @@ export const DEFAULT_OPPONENT_STATS: OpponentStats = {
   preflop: {
     // More realistic VPIP (Voluntarily Put money In Pot) and betting frequencies
     // Typical online poker: VPIP ~20-30%, PFR (Preflop Raise) ~15-20%
-    UTG: { fold: 0.70, call: 0.20, raise: 0.10 }, // Tight early position
-    "UTG+1": { fold: 0.68, call: 0.22, raise: 0.10 },
-    MP: { fold: 0.65, call: 0.25, raise: 0.10 }, // Slightly looser
-    CO: { fold: 0.60, call: 0.25, raise: 0.15 }, // More aggressive
-    BTN: { fold: 0.50, call: 0.30, raise: 0.20 }, // Most aggressive position
-    SB: { fold: 0.55, call: 0.30, raise: 0.15 }, // Defend more often
-    BB: { fold: 0.45, call: 0.45, raise: 0.10 }, // Defend wide (already invested)
+    // Increased fold frequencies and raise frequencies for more realistic play
+    UTG: { fold: 0.80, call: 0.12, raise: 0.08 }, // Tight early position - fold more
+    "UTG+1": { fold: 0.78, call: 0.14, raise: 0.08 },
+    MP: { fold: 0.75, call: 0.17, raise: 0.08 }, // Slightly looser but still tight
+    CO: { fold: 0.70, call: 0.20, raise: 0.10 }, // More aggressive
+    BTN: { fold: 0.60, call: 0.25, raise: 0.15 }, // Most aggressive position
+    SB: { fold: 0.65, call: 0.25, raise: 0.10 }, // Defend more often
+    BB: { fold: 0.55, call: 0.35, raise: 0.10 }, // Defend wide (already invested)
   },
   postflop: {
     flop: {
-      // More betting frequency - typical online poker has ~30-40% betting frequency on flop
-      "0-0.3": { fold: 0.80, call: 0.15, bet: 0.05, raise: 0.0 }, // Weak hands still fold often, but some bluffs
-      "0.3-0.5": { fold: 0.50, call: 0.35, bet: 0.12, raise: 0.03 }, // More betting with medium hands
-      "0.5-0.7": { fold: 0.15, call: 0.40, bet: 0.35, raise: 0.10 }, // Strong hands bet more often
-      "0.7-1.0": { fold: 0.03, call: 0.15, bet: 0.65, raise: 0.17 }, // Premium hands bet/raise aggressively
+      // Increased betting frequency - typical online poker has ~30-40% betting frequency on flop
+      // Made opponents bet/raise more often for harder decisions
+      "0-0.3": { fold: 0.75, call: 0.15, bet: 0.08, raise: 0.02 }, // Weak hands fold more, but more bluffs
+      "0.3-0.5": { fold: 0.40, call: 0.30, bet: 0.22, raise: 0.08 }, // More betting with medium hands
+      "0.5-0.7": { fold: 0.10, call: 0.30, bet: 0.45, raise: 0.15 }, // Strong hands bet/raise aggressively
+      "0.7-1.0": { fold: 0.02, call: 0.10, bet: 0.70, raise: 0.18 }, // Premium hands bet/raise very aggressively
     },
     turn: {
-      // Turn betting frequency increases (value betting and protection)
-      "0-0.3": { fold: 0.85, call: 0.12, bet: 0.03, raise: 0.0 },
-      "0.3-0.5": { fold: 0.65, call: 0.28, bet: 0.06, raise: 0.01 },
-      "0.5-0.7": { fold: 0.25, call: 0.35, bet: 0.30, raise: 0.10 },
-      "0.7-1.0": { fold: 0.05, call: 0.20, bet: 0.55, raise: 0.20 },
+      // Turn betting frequency increases significantly (value betting and protection)
+      "0-0.3": { fold: 0.80, call: 0.12, bet: 0.06, raise: 0.02 },
+      "0.3-0.5": { fold: 0.55, call: 0.25, bet: 0.15, raise: 0.05 },
+      "0.5-0.7": { fold: 0.15, call: 0.25, bet: 0.45, raise: 0.15 },
+      "0.7-1.0": { fold: 0.03, call: 0.12, bet: 0.65, raise: 0.20 },
     },
     river: {
-      // River: more polarized betting (value bets and bluffs)
-      "0-0.3": { fold: 0.90, call: 0.08, bet: 0.02, raise: 0.0 },
-      "0.3-0.5": { fold: 0.75, call: 0.20, bet: 0.04, raise: 0.01 },
-      "0.5-0.7": { fold: 0.35, call: 0.40, bet: 0.20, raise: 0.05 },
-      "0.7-1.0": { fold: 0.10, call: 0.25, bet: 0.50, raise: 0.15 },
+      // River: more polarized betting (value bets and bluffs) - increased betting
+      "0-0.3": { fold: 0.85, call: 0.10, bet: 0.04, raise: 0.01 },
+      "0.3-0.5": { fold: 0.65, call: 0.20, bet: 0.12, raise: 0.03 },
+      "0.5-0.7": { fold: 0.25, call: 0.30, bet: 0.35, raise: 0.10 },
+      "0.7-1.0": { fold: 0.05, call: 0.15, bet: 0.60, raise: 0.20 },
     },
   },
   betSizing: {
@@ -159,19 +161,30 @@ export function simulateRealisticPostflopAction(
   // Adjust probabilities based on facing action
   let adjustedStats = { ...rangeStats };
   if (actionToFace === "bet" || actionToFace === "raise") {
-    // When facing a bet, adjust probabilities
+    // When facing a bet, adjust probabilities - but keep betting/raising when strong
     if (handStrength < 0.5) {
-      adjustedStats.fold = Math.min(0.95, rangeStats.fold + 0.15);
+      adjustedStats.fold = Math.min(0.95, rangeStats.fold + 0.20); // Fold more when weak
+      adjustedStats.call = rangeStats.call * 0.7;
+      adjustedStats.bet = 0;
+      adjustedStats.raise = rangeStats.raise * 0.2; // Rarely raise weak hands
+    } else if (handStrength < 0.7) {
+      adjustedStats.fold = Math.min(0.75, rangeStats.fold + 0.15);
       adjustedStats.call = rangeStats.call * 0.8;
       adjustedStats.bet = 0;
-      adjustedStats.raise = rangeStats.raise * 0.3;
-    } else if (handStrength < 0.7) {
-      adjustedStats.fold = Math.min(0.80, rangeStats.fold + 0.10);
-      adjustedStats.call = rangeStats.call * 0.9;
+      adjustedStats.raise = rangeStats.raise * 0.8; // Raise more with medium hands
+    } else {
+      // Strong hands - increase raise frequency when facing bets
+      adjustedStats.fold = rangeStats.fold * 0.5;
+      adjustedStats.call = rangeStats.call * 0.7;
       adjustedStats.bet = 0;
-      adjustedStats.raise = rangeStats.raise * 0.7;
+      adjustedStats.raise = Math.min(0.4, rangeStats.raise * 1.5); // Raise more often with strong hands
     }
-    // Strong hands keep their raise frequency
+  } else {
+    // When checking or no action to face, increase betting frequency
+    if (handStrength >= 0.5) {
+      adjustedStats.bet = rangeStats.bet * 1.3; // Bet more when strong and no bet to face
+      adjustedStats.raise = rangeStats.raise * 1.2;
+    }
   }
 
   // Normalize probabilities

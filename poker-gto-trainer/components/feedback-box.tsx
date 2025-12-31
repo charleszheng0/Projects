@@ -5,7 +5,6 @@ import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { CheckCircle2, XCircle } from "lucide-react";
 import { calculateEVLoss, formatEV, getEVColorClass } from "@/lib/ev-calculator";
-import { getHandStrengthDescription } from "@/lib/hand-categorization";
 
 export function FeedbackBox() {
   const { 
@@ -20,29 +19,11 @@ export function FeedbackBox() {
     optimalActions,
     betSizeBB,
     numPlayers,
-    explanation,
-    postFlopExplanation
+    handEV // Use handEV from store (calculated per action, reset per hand)
   } = useGameStore();
 
-  // Calculate EV loss if we have all required data
-  let evLoss: number | null = null;
-  if (playerHand && lastAction && optimalActions.length > 0) {
-    try {
-      evLoss = calculateEVLoss(
-        playerHand,
-        communityCards || [],
-        gameStage,
-        pot,
-        currentBet,
-        lastAction,
-        optimalActions,
-        betSizeBB || undefined,
-        numPlayers
-      );
-    } catch (error) {
-      // EV calculation failed, continue without it
-    }
-  }
+  // Use handEV from store (already calculated and tracked per hand)
+  const evLoss: number | null = handEV !== 0 ? handEV : null;
 
   if (!feedback) {
     return (
@@ -86,14 +67,6 @@ export function FeedbackBox() {
             {optimalActions.length > 0 && (
               <Badge variant="outline" className="text-green-300 border-green-600 bg-green-900/20">
                 Optimal: {optimalActions.join(", ")}
-              </Badge>
-            )}
-            {((gameStage === "preflop" && explanation?.handStrengthDescription) || 
-              (gameStage !== "preflop" && postFlopExplanation?.streetDescription)) && (
-              <Badge variant="outline" className="text-blue-300 border-blue-600 bg-blue-900/20">
-                {gameStage === "preflop" 
-                  ? explanation?.handStrengthDescription 
-                  : postFlopExplanation?.streetDescription}
               </Badge>
             )}
             {evLoss !== null && evLoss > 0 && (

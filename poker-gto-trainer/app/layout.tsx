@@ -38,7 +38,7 @@ export default function RootLayout({
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
           suppressHydrationWarning
         >
-          <header className="fixed top-0 right-0 z-50 p-4">
+          <header className="fixed top-0 right-0 z-50 p-4 pr-6">
             <SignedOut>
               <div className="flex gap-3">
                 <SignInButton>
@@ -60,13 +60,15 @@ export default function RootLayout({
               </div>
             </SignedOut>
             <SignedIn>
-              <UserButton
-                appearance={{
-                  elements: {
-                    avatarBox: "w-10 h-10",
-                  },
-                }}
-              />
+              <div className="flex items-center gap-4">
+                <UserButton
+                  appearance={{
+                    elements: {
+                      avatarBox: "w-10 h-10",
+                    },
+                  }}
+                />
+              </div>
             </SignedIn>
           </header>
           {children}
