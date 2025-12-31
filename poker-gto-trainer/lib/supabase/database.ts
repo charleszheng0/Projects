@@ -1,4 +1,4 @@
-import { createServerClient } from './server';
+import { createClient } from './server';
 import { createAdminClient } from './server';
 
 /**
@@ -56,7 +56,7 @@ export interface GTOSolution {
  * Profiles
  */
 export async function getProfile(userId: string): Promise<Profile | null> {
-  const supabase = createServerClient();
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from('profiles')
     .select('*')
@@ -71,7 +71,7 @@ export async function getProfile(userId: string): Promise<Profile | null> {
 }
 
 export async function createProfile(userId: string): Promise<Profile> {
-  const supabase = createServerClient();
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from('profiles')
     .insert({ user_id: userId })
@@ -89,7 +89,7 @@ export async function createTrainingSession(
   userId: string,
   datasetId: string
 ): Promise<TrainingSession> {
-  const supabase = createServerClient();
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from('training_sessions')
     .insert({
@@ -104,7 +104,7 @@ export async function createTrainingSession(
 }
 
 export async function getTrainingSessions(userId: string): Promise<TrainingSession[]> {
-  const supabase = createServerClient();
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from('training_sessions')
     .select('*')
@@ -116,7 +116,7 @@ export async function getTrainingSessions(userId: string): Promise<TrainingSessi
 }
 
 export async function getTrainingSession(sessionId: number): Promise<TrainingSession | null> {
-  const supabase = createServerClient();
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from('training_sessions')
     .select('*')
@@ -137,7 +137,7 @@ export async function createHand(
   sessionId: string | number,
   handData: Record<string, any>
 ): Promise<Hand> {
-  const supabase = createServerClient();
+  const supabase = await createClient();
   // Convert sessionId to string since hands.session_id is uuid but training_sessions.id is bigint
   const sessionIdStr = String(sessionId);
   const { data, error } = await supabase
@@ -154,7 +154,7 @@ export async function createHand(
 }
 
 export async function getHandsBySession(sessionId: string | number): Promise<Hand[]> {
-  const supabase = createServerClient();
+  const supabase = await createClient();
   // Convert sessionId to string for comparison
   const sessionIdStr = String(sessionId);
   const { data, error } = await supabase
@@ -179,7 +179,7 @@ export async function createUserDecision(
     bet_size_bb: number;
   }
 ): Promise<UserDecision> {
-  const supabase = createServerClient();
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from('user_decisions')
     .insert({
@@ -194,7 +194,7 @@ export async function createUserDecision(
 }
 
 export async function getDecisionsByHand(handId: string): Promise<UserDecision[]> {
-  const supabase = createServerClient();
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from('user_decisions')
     .select('*')
@@ -209,7 +209,7 @@ export async function getDecisionsByHand(handId: string): Promise<UserDecision[]
  * Datasets
  */
 export async function getDatasets(): Promise<Dataset[]> {
-  const supabase = createServerClient();
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from('datasets')
     .select('*')
@@ -226,7 +226,7 @@ export async function getGTOSolution(
   datasetId: string,
   situation: Record<string, any>
 ): Promise<GTOSolution | null> {
-  const supabase = createServerClient();
+  const supabase = await createClient();
   
   // Query using JSONB operators
   let query = supabase
@@ -258,7 +258,7 @@ export async function searchGTOSolutions(
   datasetId: string,
   filters: Record<string, any>
 ): Promise<GTOSolution[]> {
-  const supabase = createServerClient();
+  const supabase = await createClient();
   
   let query = supabase
     .from('gto_solutions')

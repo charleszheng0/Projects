@@ -871,7 +871,7 @@ export const useGameStore = create<GameState>((set) => ({
               opponentAction.betSizeBB > currentBetAmount * 1.5;
             
             if (opponentRaises && opponentSeat !== null && Math.random() < 0.25) {
-              const betSize = opponentAction.betSizeBB;
+              const betSize = opponentAction.betSizeBB ?? 0;
               const updatedBets = [...currentState.playerBetsBB];
               updatedBets[opponentSeat] = betSize;
               
@@ -943,7 +943,7 @@ export const useGameStore = create<GameState>((set) => ({
           
           if (opponentRaises && opponentSeat !== null && Math.random() < 0.25) {
             // Opponent raises (30% chance) - player needs to respond one more time
-            const betSize = opponentAction.betSizeBB;
+            const betSize = opponentAction.betSizeBB ?? 0;
             const updatedBets = [...currentState.playerBetsBB];
             updatedBets[opponentSeat] = betSize;
             

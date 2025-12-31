@@ -164,7 +164,9 @@ export function convertBulkDataToRecord(data: BulkHandData): HandHistoryRecord {
   
   // Parse community cards
   const communityCards = data.communityCards 
-    ? parseCommunityCards(data.communityCards)
+    ? (Array.isArray(data.communityCards) && typeof data.communityCards[0] === 'object' && 'rank' in data.communityCards[0]
+      ? data.communityCards as Card[]
+      : parseCommunityCards(data.communityCards as string | string[]))
     : [];
   
   // Normalize position and stage

@@ -111,8 +111,8 @@ export function FeedbackModal() {
             {/* Hand Strength Category & Street Info */}
             {currentExplanation && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Hand Strength Category */}
-                {currentExplanation.handStrengthCategory && (
+                {/* Hand Strength Category (preflop only) */}
+                {isPreflop && explanation?.handStrengthCategory && (
                   <div className="bg-blue-900/30 rounded-lg p-4 border border-blue-700">
                     <div className="flex items-center gap-2 mb-2">
                       <Badge variant="outline" className="bg-blue-600/20 text-blue-300 border-blue-500">
@@ -120,16 +120,16 @@ export function FeedbackModal() {
                       </Badge>
                     </div>
                     <h4 className="text-white font-semibold mb-1">
-                      {currentExplanation.handStrengthDescription}
+                      {explanation.handStrengthDescription}
                     </h4>
                     <p className="text-gray-300 text-sm leading-relaxed">
-                      {currentExplanation.handStrengthExplanation}
+                      {explanation.handStrengthExplanation}
                     </p>
                   </div>
                 )}
                 
-                {/* Street Information (for postflop) */}
-                {currentExplanation.streetNumber && (
+                {/* Street Information */}
+                {(isPreflop && explanation?.streetNumber) || (!isPreflop && postFlopExplanation?.streetNumber) ? (
                   <div className="bg-purple-900/30 rounded-lg p-4 border border-purple-700">
                     <div className="flex items-center gap-2 mb-2">
                       <Badge variant="outline" className="bg-purple-600/20 text-purple-300 border-purple-500">
@@ -137,13 +137,17 @@ export function FeedbackModal() {
                       </Badge>
                     </div>
                     <h4 className="text-white font-semibold mb-1">
-                      {currentExplanation.streetDescription}
+                      {isPreflop 
+                        ? explanation?.streetDescription 
+                        : postFlopExplanation?.streetDescription}
                     </h4>
                     <p className="text-gray-300 text-sm leading-relaxed">
-                      {currentExplanation.streetExplanation}
+                      {isPreflop 
+                        ? explanation?.streetExplanation 
+                        : postFlopExplanation?.streetExplanation}
                     </p>
                   </div>
-                )}
+                ) : null}
               </div>
             )}
 

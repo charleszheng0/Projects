@@ -267,7 +267,7 @@ export function BulkDataImporter() {
         <div className="flex gap-2">
           <Button
             onClick={handleImport}
-            disabled={!jsonInput.trim() || importing || (validation && !validation.valid)}
+            disabled={!jsonInput.trim() || importing || (validation ? !validation.valid : false)}
             className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {importing ? "Importing..." : "Import Data"}

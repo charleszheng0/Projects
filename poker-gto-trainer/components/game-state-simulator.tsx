@@ -216,10 +216,12 @@ export function GameStateSimulator() {
   const advanceToStage = (stage: GameStage | "random") => {
     if (!currentHand) return;
     
-    let targetStage: GameStage = stage;
+    let targetStage: GameStage;
     if (stage === "random") {
       const stages: GameStage[] = ["preflop", "flop", "turn", "river"];
       targetStage = stages[Math.floor(Math.random() * stages.length)];
+    } else {
+      targetStage = stage;
     }
     
     let newCommunityCards: Card[] = [];
