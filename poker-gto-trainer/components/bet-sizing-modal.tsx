@@ -6,62 +6,114 @@ import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { X } from "lucide-react";
+import { validateAndAdjustBetSize, calculateValidBetSizes } from "@/lib/action-validation";
+import { formatBB } from "@/lib/utils";
 
 export function BetSizingModal() {
-  const { showBetSizingModal, pendingAction, gameStage, pot, bigBlind, playerStackBB, confirmBetSize, cancelBetSize, showFeedbackModal } = useGameStore();
+  const { 
+    showBetSizingModal, 
+    pendingAction, 
+    gameStage, 
+    pot, 
+    bigBlind, 
+    playerStackBB, 
+    confirmBetSize, 
+    cancelBetSize, 
+    showFeedbackModal,
+    currentBet,
+    playerBetsBB,
+    playerSeat
+  } = useGameStore();
   const isPreflop = gameStage === "preflop";
+  
+  // Calculate current player's bet and remaining stack
+  const playerCurrentBet = playerBetsBB?.[playerSeat] || 0;
+  const remainingStack = Math.max(0, (playerStackBB || 100) - playerCurrentBet);
   
   // Calculate default bet size based on stage
   const getDefaultBetSize = () => {
-    if (isPreflop) return 3;
+    if (isPreflop) {
+      // Preflop: default to 3x BB
+      return Math.max(bigBlind * 2, 3);
+    }
     // Post-flop: default to 50% pot
     return Math.max(1, Math.round(pot * 0.5));
   };
   
   const [betSizeBB, setBetSizeBB] = useState<number>(getDefaultBetSize());
   const [inputValue, setInputValue] = useState<string>("");
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   // Reset input when modal opens
   useEffect(() => {
     if (showBetSizingModal) {
-      setBetSizeBB(getDefaultBetSize());
+      const defaultSize = getDefaultBetSize();
+      setBetSizeBB(defaultSize);
       setInputValue("");
+      setValidationError(null);
     }
-  }, [showBetSizingModal, gameStage, pot]);
+  }, [showBetSizingModal, gameStage, pot, currentBet]);
+  
+  // Validate bet size whenever it changes
+  useEffect(() => {
+    if (showBetSizingModal && pendingAction && (pendingAction === "bet" || pendingAction === "raise")) {
+      const effectiveSize = getEffectiveBetSize();
+      if (effectiveSize > 0) {
+        const validation = validateAndAdjustBetSize(
+          pendingAction,
+          effectiveSize,
+          gameStage,
+          pot,
+          currentBet,
+          playerCurrentBet,
+          remainingStack,
+          bigBlind
+        );
+        
+        if (!validation.isValid && validation.error) {
+          setValidationError(validation.error);
+        } else {
+          setValidationError(null);
+          // Auto-adjust if needed
+          if (validation.adjustedSize !== effectiveSize) {
+            setBetSizeBB(validation.adjustedSize);
+            setInputValue("");
+          }
+        }
+      }
+    }
+  }, [betSizeBB, inputValue, showBetSizingModal, pendingAction, gameStage, pot, currentBet, playerCurrentBet, remainingStack, bigBlind]);
 
   if (!showBetSizingModal || !pendingAction) {
     return null;
   }
 
-  const maxBet = playerStackBB;
+  const maxBet = pendingAction === "bet" 
+    ? remainingStack 
+    : remainingStack + playerCurrentBet; // For raise, can use full stack
   
   // Calculate pot percentage for current bet size
   const betSizePotPercent = pot > 0 ? Math.round((betSizeBB / pot) * 100) : 0;
   
-  // Generate quick sizes based on stage
+  // Generate quick sizes based on stage - use validation system
   const getQuickSizes = () => {
-    if (isPreflop) {
-      return [2, 3, 5, 10, 20, 50]; // Fixed BB amounts for preflop
-    } else {
-      // Post-flop: MIN, 1/2 pot, 3/4 pot, POT, MAX (similar to betonline)
-      const minBet = Math.max(1, Math.ceil(pot * 0.33)); // Minimum bet (round up)
-      const halfPot = Math.max(1, Math.ceil(pot * 0.5)); // Half pot (round up)
-      const threeQuarterPot = Math.max(1, Math.ceil(pot * 0.75)); // 3/4 pot (round up)
-      const fullPot = Math.max(1, Math.ceil(pot * 1.0)); // Full pot
-      const maxBetAmount = maxBet; // Maximum bet (player's stack)
-      
-      const sizes = [
-        minBet,
-        halfPot,
-        threeQuarterPot,
-        fullPot,
-        maxBetAmount,
-      ]
-        .filter(size => size >= 1 && size <= maxBet)
-        .filter((size, index, self) => self.indexOf(size) === index); // Remove duplicates
-      
-      return sizes;
+    if (!pendingAction || (pendingAction !== "bet" && pendingAction !== "raise")) {
+      return [];
     }
+    
+    // Use validation system to calculate valid sizes
+    const validSizes = calculateValidBetSizes(
+      pendingAction,
+      gameStage,
+      pot,
+      currentBet,
+      playerCurrentBet,
+      remainingStack,
+      bigBlind
+    );
+    
+    // Limit to reasonable number of options
+    return validSizes.slice(0, 6);
   };
   
   const getQuickSizeLabel = (size: number, index: number) => {
@@ -88,10 +140,39 @@ export function BetSizingModal() {
 
   const handleConfirm = () => {
     const finalValue = getEffectiveBetSize();
-    if (finalValue > 0 && finalValue <= maxBet) {
-      confirmBetSize(finalValue);
+    
+    // Validate before confirming
+    if (!pendingAction || (pendingAction !== "bet" && pendingAction !== "raise")) {
+      return;
+    }
+    
+    const validation = validateAndAdjustBetSize(
+      pendingAction,
+      finalValue,
+      gameStage,
+      pot,
+      currentBet,
+      playerCurrentBet,
+      remainingStack,
+      bigBlind
+    );
+    
+    if (!validation.isValid) {
+      setValidationError(validation.error || "Invalid bet size");
+      if (validation.adjustedSize) {
+        setBetSizeBB(validation.adjustedSize);
+        setInputValue("");
+      }
+      return;
+    }
+    
+    // Use adjusted size if validation adjusted it
+    const confirmedSize = validation.adjustedSize;
+    if (confirmedSize > 0 && confirmedSize <= remainingStack + playerCurrentBet) {
+      confirmBetSize(confirmedSize);
       setBetSizeBB(getDefaultBetSize()); // Reset for next time
       setInputValue(""); // Clear input
+      setValidationError(null);
     }
   };
 
@@ -187,10 +268,19 @@ export function BetSizingModal() {
             {/* Instructions */}
             <p className="text-gray-400 text-sm">
               {isPreflop 
-                ? `Select the number of big blinds (BBs) to ${pendingAction === "bet" ? "bet" : "raise"}`
-                : `Select bet size (pot size: ${pot} BB). Bet sizing is pot-relative on post-flop streets.`
+                ? `Select the number of big blinds (BBs) to ${pendingAction === "bet" ? "bet" : "raise"} (min: ${bigBlind * 2} BB)`
+                : pendingAction === "bet"
+                ? `Select bet size (pot: ${formatBB(pot)} BB, min: ${Math.max(1, bigBlind)} BB)`
+                : `Select raise size (current bet: ${formatBB(currentBet)} BB, min raise: ${formatBB(currentBet * 2)} BB)`
               }
             </p>
+            
+            {/* Validation Error */}
+            {validationError && (
+              <div className="bg-red-900/30 border border-red-500 text-red-300 px-3 py-2 rounded text-sm">
+                {validationError}
+              </div>
+            )}
 
             {/* Quick Size Buttons */}
             <div className="space-y-3">
@@ -284,8 +374,8 @@ export function BetSizingModal() {
                 onClick={handleConfirm}
                 variant="default"
                 size="lg"
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
-                disabled={getEffectiveBetSize() < 1 || getEffectiveBetSize() > maxBet}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={validationError !== null || getEffectiveBetSize() < 1 || getEffectiveBetSize() > maxBet}
               >
                 Confirm {getEffectiveBetSize()} BB
                 {!isPreflop && pot > 0 && ` (${Math.round((getEffectiveBetSize() / pot) * 100)}% pot)`}

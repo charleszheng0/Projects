@@ -47,14 +47,8 @@ export function ActionHistoryBar() {
     });
   }
   
-  // Add current street if no actions yet
-  if (actionHistory.length === 0) {
-    breadcrumbs.push({
-      type: "street",
-      label: gameStage.toUpperCase(),
-      data: { actions: [] }
-    });
-  }
+  // Don't show street label when there are no actions yet
+  // (removed the initial street badge display)
   
   // Add community cards to street markers
   const getStreetCards = (street: string) => {
@@ -69,6 +63,11 @@ export function ActionHistoryBar() {
     }
     return [];
   };
+
+  // Don't show anything if there are no actions
+  if (actionHistory.length === 0 && breadcrumbs.length === 0) {
+    return null;
+  }
 
   return (
     <div className="w-full bg-[#0f0f0f] border-b border-gray-800 px-4 py-2 overflow-x-auto">

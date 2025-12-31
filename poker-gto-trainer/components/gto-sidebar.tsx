@@ -1,11 +1,13 @@
 "use client";
 
 import { useGameStore } from "@/store/game-store";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { RangeVisualizer } from "./range-visualizer";
 import { formatBB } from "@/lib/utils";
 import { calculateEV } from "@/lib/ev-calculator";
 import { Hand } from "@/lib/gto";
+import { generateSidebarAnalysis } from "@/lib/sidebar-analysis";
+import { getPositionFromSeat } from "@/lib/gto";
 
 /**
  * Determine correctness level based on EV loss and isCorrect flag
@@ -74,7 +76,21 @@ export function GTOSidebar() {
     evLoss,
     actionHistory,
     currentHandId,
+    communityCards,
+    playerSeat,
+    opponentHands,
+    solverTree,
   } = useGameStore();
+  
+  // Track pot before action for comparison
+  const potBeforeRef = useRef<number>(pot);
+  
+  // Update pot before when action changes
+  useEffect(() => {
+    if (lastAction !== null) {
+      potBeforeRef.current = pot;
+    }
+  }, [lastAction, pot]);
 
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [activeTab, setActiveTab] = useState<"strategy" | "ranges">("strategy");
@@ -145,23 +161,56 @@ export function GTOSidebar() {
     }
   }, [playerHand, lastAction, optimalActions, gameStage, pot, currentBet, betSizeBB, numPlayers]);
 
-  // Calculate frequency breakdown
+  // Get solver-based analysis
+  const sidebarAnalysis = useMemo(() => {
+    if (!playerHand) return null;
+    
+    // Find first active opponent for position comparison
+    const opponentSeat = opponentHands.findIndex((hand, seat) => hand !== null && seat !== playerSeat);
+    if (opponentSeat === -1) return null;
+    
+    const villainPosition = getPositionFromSeat(opponentSeat, numPlayers);
+    
+    return generateSidebarAnalysis(
+      gameStage,
+      playerPosition,
+      villainPosition,
+      communityCards,
+      pot,
+      potBeforeRef.current,
+      currentBet,
+      playerHand,
+      opponentHands[opponentSeat] || null,
+      numPlayers,
+      solverTree
+    );
+  }, [playerHand, gameStage, playerPosition, communityCards, pot, currentBet, numPlayers, playerSeat, opponentHands, solverTree]);
+  
+  // Calculate frequency breakdown from solver data
   const frequencyBreakdown = useMemo(() => {
-    if (!playerHand || optimalActions.length === 0) return null;
-
-    // Simplified frequency calculation - in real implementation, use solver data
-    const total = optimalActions.length;
-    const foldFreq = optimalActions.filter(a => a === "fold").length / total * 100;
-    // Check is a BettingAction, not Action, so we check for call only
-    const callFreq = optimalActions.filter(a => a === "call").length / total * 100;
-    const raiseFreq = optimalActions.filter(a => a === "bet" || a === "raise").length / total * 100;
-
+    if (!sidebarAnalysis || !sidebarAnalysis.actionFrequencies.length) {
+      // Fallback to simplified calculation
+      if (!playerHand || optimalActions.length === 0) return null;
+      const total = optimalActions.length;
+      const foldFreq = optimalActions.filter(a => a === "fold").length / total * 100;
+      const callFreq = optimalActions.filter(a => a === "call").length / total * 100;
+      const raiseFreq = optimalActions.filter(a => a === "bet" || a === "raise").length / total * 100;
+      return { fold: foldFreq, call: callFreq, raise: raiseFreq };
+    }
+    
+    // Use solver frequencies
+    const frequencies = sidebarAnalysis.actionFrequencies;
+    const foldFreq = frequencies.filter(f => f.action === "fold").reduce((sum, f) => sum + f.frequency, 0);
+    const callFreq = frequencies.filter(f => f.action === "call" || f.action === "check").reduce((sum, f) => sum + f.frequency, 0);
+    const raiseFreq = frequencies.filter(f => f.action === "bet" || f.action === "raise").reduce((sum, f) => sum + f.frequency, 0);
+    
     return {
       fold: foldFreq,
       call: callFreq,
       raise: raiseFreq,
+      detailed: frequencies, // Store detailed frequencies for display
     };
-  }, [playerHand, optimalActions]);
+  }, [sidebarAnalysis, playerHand, optimalActions]);
 
   // Calculate running stats
   const runningStats = useMemo(() => {
@@ -245,9 +294,19 @@ export function GTOSidebar() {
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs text-gray-400">Best Move</span>
                         <span className="text-sm font-semibold text-white">
-                          {optimalActions[0] || "N/A"}
+                          {sidebarAnalysis?.bestEVAction 
+                            ? `${sidebarAnalysis.bestEVAction.type.toUpperCase()}${sidebarAnalysis.bestEVAction.size ? ` ${Math.round(sidebarAnalysis.bestEVAction.size * 100)}% pot` : ""}`
+                            : (optimalActions[0] || "N/A")}
                         </span>
                       </div>
+                      {sidebarAnalysis?.bestEVAction && (
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs text-gray-400">Best EV</span>
+                          <span className="text-sm font-semibold text-green-400">
+                            {sidebarAnalysis.bestEVAction.ev >= 0 ? "+" : ""}{sidebarAnalysis.bestEVAction.ev.toFixed(2)} BB
+                          </span>
+                        </div>
+                      )}
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs text-gray-400">Your Move</span>
                         <span className="text-sm font-semibold text-white">
@@ -280,12 +339,121 @@ export function GTOSidebar() {
                       )}
                     </>
                   )}
+                  
+                  {/* Pot Size Information */}
+                  {sidebarAnalysis && (
+                    <div className="mt-2 pt-2 border-t border-gray-700">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-gray-400">Pot Before</span>
+                        <span className="text-sm font-semibold text-white">
+                          {formatBB(sidebarAnalysis.potBefore)} BB
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-gray-400">Pot After</span>
+                        <span className="text-sm font-semibold text-white">
+                          {formatBB(sidebarAnalysis.potAfter)} BB
+                        </span>
+                      </div>
+                      {sidebarAnalysis.potChange !== 0 && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-gray-400">Change</span>
+                          <span className={`text-sm font-semibold ${
+                            sidebarAnalysis.potChange > 0 ? "text-green-400" : "text-red-400"
+                          }`}>
+                            {sidebarAnalysis.potChange > 0 ? "+" : ""}{formatBB(sidebarAnalysis.potChange)} BB
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            {/* Board Texture Analysis */}
+            {sidebarAnalysis?.boardTexture && communityCards.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">Board Texture</h3>
+                <div className="p-3 rounded-lg border border-gray-700 bg-gray-800/50">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <span className="text-xs text-gray-400">Range Advantage</span>
+                      <div className={`text-sm font-semibold mt-1 ${
+                        sidebarAnalysis.boardTexture.rangeAdvantage === "hero" ? "text-green-400" :
+                        sidebarAnalysis.boardTexture.rangeAdvantage === "villain" ? "text-red-400" :
+                        "text-gray-400"
+                      }`}>
+                        {sidebarAnalysis.boardTexture.rangeAdvantage === "hero" ? "Hero" :
+                         sidebarAnalysis.boardTexture.rangeAdvantage === "villain" ? "Villain" :
+                         "Neutral"}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-xs text-gray-400">Nut Advantage</span>
+                      <div className={`text-sm font-semibold mt-1 ${
+                        sidebarAnalysis.boardTexture.nutAdvantage === "hero" ? "text-green-400" :
+                        sidebarAnalysis.boardTexture.nutAdvantage === "villain" ? "text-red-400" :
+                        "text-gray-400"
+                      }`}>
+                        {sidebarAnalysis.boardTexture.nutAdvantage === "hero" ? "Hero" :
+                         sidebarAnalysis.boardTexture.nutAdvantage === "villain" ? "Villain" :
+                         "Neutral"}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-xs text-gray-400">Wetness</span>
+                      <div className="text-sm font-semibold mt-1 text-white capitalize">
+                        {sidebarAnalysis.boardTexture.wetness}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-xs text-gray-400">Connectivity</span>
+                      <div className="text-sm font-semibold mt-1 text-white capitalize">
+                        {sidebarAnalysis.boardTexture.connectivity}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* Frequency Breakdown */}
-            {frequencyBreakdown && (
+            {/* Solver Frequencies Breakdown */}
+            {sidebarAnalysis && sidebarAnalysis.actionFrequencies.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">Solver Frequencies</h3>
+                <div className="space-y-2">
+                  {sidebarAnalysis.actionFrequencies.map((freq, idx) => {
+                    // betSize is already a pot multiplier (0.33, 0.5, etc), convert to percentage
+                    const actionLabel = freq.action.toUpperCase() + (freq.betSize ? ` ${Math.round(freq.betSize * 100)}%` : "");
+                    return (
+                      <div key={idx}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs text-gray-400">{actionLabel}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-500">EV: {freq.ev >= 0 ? "+" : ""}{freq.ev.toFixed(2)}</span>
+                            <span className="text-sm font-semibold text-white">{freq.frequency.toFixed(1)}%</span>
+                          </div>
+                        </div>
+                        <div className="w-full bg-gray-800 rounded-full h-2">
+                          <div
+                            className={`h-2 rounded-full transition-all duration-300 ${
+                              freq.action === "fold" ? "bg-blue-500" :
+                              freq.action === "check" || freq.action === "call" ? "bg-green-500" :
+                              "bg-red-500"
+                            }`}
+                            style={{ width: `${freq.frequency}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            
+            {/* Fallback Frequency Breakdown */}
+            {(!sidebarAnalysis || !sidebarAnalysis.actionFrequencies.length) && frequencyBreakdown && (
               <div className="space-y-3">
                 <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">Range Frequencies</h3>
                 <div className="space-y-2">
@@ -320,6 +488,34 @@ export function GTOSidebar() {
                       className="bg-red-500 h-2 rounded-full transition-all duration-300"
                       style={{ width: `${frequencyBreakdown.raise}%` }}
                     />
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Combination Breakdown */}
+            {sidebarAnalysis?.combinationBreakdown && Object.keys(sidebarAnalysis.combinationBreakdown).length > 0 && (
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">Combination Breakdown</h3>
+                <div className="p-3 rounded-lg border border-gray-700 bg-gray-800/50 max-h-48 overflow-y-auto">
+                  <div className="space-y-2 text-xs">
+                    {Object.entries(sidebarAnalysis.combinationBreakdown).slice(0, 10).map(([hand, actions]) => (
+                      <div key={hand} className="flex items-center justify-between py-1 border-b border-gray-700/50">
+                        <span className="text-gray-300 font-mono">{hand}</span>
+                        <div className="flex gap-2">
+                          {Object.entries(actions).map(([action, freq]) => (
+                            <span key={action} className="text-gray-400">
+                              {action}: {(freq * 100).toFixed(0)}%
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    {Object.keys(sidebarAnalysis.combinationBreakdown).length > 10 && (
+                      <div className="text-gray-500 text-center pt-2">
+                        +{Object.keys(sidebarAnalysis.combinationBreakdown).length - 10} more combinations
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

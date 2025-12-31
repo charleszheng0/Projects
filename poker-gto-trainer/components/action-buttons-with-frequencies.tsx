@@ -6,6 +6,8 @@ import { BettingAction } from "@/lib/postflop-gto";
 import { getRealisticFrequencies, ActionFrequency } from "@/lib/gto-frequencies";
 import { useState, useEffect } from "react";
 import { formatBB } from "@/lib/utils";
+import { validateAction, getAvailableActions } from "@/lib/action-validation";
+import { ContinueButton } from "./continue-button";
 
 /**
  * Determine correctness level based on EV loss and isCorrect flag
@@ -102,17 +104,36 @@ export function ActionButtonsWithFrequencies() {
     }
   }, [isCorrect, lastAction, isPlayerTurn]);
 
-  // Show buttons when it's player's turn OR when showing feedback
-  if (!playerHand || (!isPlayerTurn && !showFeedback)) {
+  // CRITICAL: Show buttons when it's player's turn OR when showing feedback
+  // But disable all buttons when not player's turn
+  if (!playerHand) {
+    return null;
+  }
+  
+  // Show buttons even when showing feedback, but disable them if not player's turn
+  const buttonsDisabled = !isPlayerTurn && !showFeedback;
+  
+  if (!isPlayerTurn && !showFeedback) {
+    // Don't show buttons when not player's turn and not showing feedback
     return null;
   }
 
+  // CRITICAL: Use validation system to determine available actions
   const isPreflop = gameStage === "preflop";
-  const canCheck = !isPreflop && (actionToFace === "check" || actionToFace === null);
-  const canBet = !isPreflop && (actionToFace === "check" || actionToFace === null);
-  const canCall = actionToFace === "bet" || actionToFace === "raise" || (isPreflop && currentBet > 0);
-  const canFold = !canCheck && (isPreflop || actionToFace === "bet" || actionToFace === "raise");
-  const canRaise = isPreflop || canCall;
+  const playerCurrentBet = playerBetsBB?.[playerSeat] || 0;
+  const availableActions = getAvailableActions(
+    gameStage,
+    actionToFace,
+    currentBet,
+    playerCurrentBet,
+    isPreflop
+  );
+  
+  const canCheck = availableActions.includes("check");
+  const canBet = availableActions.includes("bet");
+  const canCall = availableActions.includes("call");
+  const canFold = availableActions.includes("fold");
+  const canRaise = availableActions.includes("raise");
 
   // Calculate GTO frequencies for all actions
   const actionFrequencies = playerHand && optimalActions.length > 0
@@ -294,20 +315,42 @@ export function ActionButtonsWithFrequencies() {
   }
 
   const handleActionClick = (frequency: ActionFrequency) => {
+    // CRITICAL: Validate action before proceeding
+    if (!isPlayerTurn) {
+      return; // Don't allow actions when not player's turn
+    }
+    
+    // Get current state for validation
+    const state = useGameStore.getState();
+    const playerCurrentBet = state.playerBetsBB?.[state.playerSeat] || 0;
+    
+    // Validate action
+    const validation = validateAction(
+      frequency.action as Action | BettingAction,
+      gameStage,
+      actionToFace,
+      currentBet,
+      playerCurrentBet,
+      playerStackBB || 100,
+      bigBlind,
+      frequency.betSize
+    );
+    
+    if (!validation.isValid) {
+      console.warn("Invalid action:", validation.error);
+      return; // Don't proceed with invalid action
+    }
+    
     setSelectedAction({ action: frequency.action, betSize: frequency.betSize });
     
     if (frequency.action === "fold" || frequency.action === "check" || frequency.action === "call") {
+      // Direct actions - no bet sizing needed
       selectAction(frequency.action);
     } else if (frequency.action === "bet" || frequency.action === "raise") {
+      // Bet/raise actions - always open bet sizing modal
+      // The modal will handle validation and confirmation
       selectAction(frequency.action);
-      if (frequency.betSize) {
-        setTimeout(() => {
-          const state = useGameStore.getState();
-          if (state.showBetSizingModal) {
-            useGameStore.getState().confirmBetSize(frequency.betSize!);
-          }
-        }, 100);
-      }
+      // If betSize is provided, it will be used as default in the modal
     }
   };
 
@@ -392,11 +435,13 @@ export function ActionButtonsWithFrequencies() {
         <button
           onClick={() => handleActionClick(freq)}
           className={getActionButtonClass(freq, isSelected || false, isCorrect)}
-          disabled={!isPlayerTurn || (showFeedback && !isSelected)}
+          disabled={buttonsDisabled || (showFeedback && !isSelected)}
           style={{ 
             transition: "all 220ms cubic-bezier(0.25, 0.1, 0.25, 1.0)",
-            opacity: (!isPlayerTurn || (showFeedback && !isSelected)) ? 0.6 : 1
+            opacity: (buttonsDisabled || (showFeedback && !isSelected)) ? 0.5 : 1,
+            cursor: (buttonsDisabled || (showFeedback && !isSelected)) ? "not-allowed" : "pointer"
           }}
+          title={buttonsDisabled ? "Not your turn" : ""}
         >
           {/* Action Label - fades out during morph */}
           <span 
@@ -468,6 +513,9 @@ export function ActionButtonsWithFrequencies() {
           {sortedRaiseBetButtons.map((freq, idx) => renderButton(freq, foldCallButtons.length + idx))}
         </div>
       )}
+      
+      {/* Continue Button - appears after action */}
+      <ContinueButton />
     </div>
   );
 }
