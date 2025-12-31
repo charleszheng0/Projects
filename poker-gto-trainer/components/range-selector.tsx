@@ -49,14 +49,13 @@ export function RangeSelector() {
     useCustomRange,
     toggleHandInRange,
     setUseCustomRange,
-    playerHand,
-    isPlayerTurn,
+    canSelectRange,
   } = useGameStore();
   
   const [isOpen, setIsOpen] = useState(false);
   
-  // CRITICAL: Read-only during hand (doesn't block actions, just prevents editing)
-  const isReadOnly = !!playerHand;
+  // CRITICAL: Use independent state for range selection (not tied to playerHand)
+  const isReadOnly = !canSelectRange;
   
   if (!isOpen) {
     return (
@@ -64,7 +63,11 @@ export function RangeSelector() {
         onClick={() => setIsOpen(true)}
         variant="outline"
         size="sm"
-        className="bg-gray-800 hover:bg-gray-700 text-white border-gray-600"
+        disabled={!canSelectRange}
+        className={`bg-gray-800 hover:bg-gray-700 text-white border-gray-600 ${
+          !canSelectRange ? "opacity-50 cursor-not-allowed" : ""
+        }`}
+        title={!canSelectRange ? "Range selection locked while making a decision" : "Select Range"}
       >
         Select Range
       </Button>
@@ -96,7 +99,7 @@ export function RangeSelector() {
       
       {isReadOnly && (
         <div className="mb-2 text-yellow-400 text-sm">
-          Range locked during hand - edit between hands
+          Range locked while making a decision - edit when it's not your turn
         </div>
       )}
       

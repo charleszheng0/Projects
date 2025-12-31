@@ -74,7 +74,8 @@ export function ActionButtonsWithFrequencies() {
     betSizeBB,
     evLoss,
     playerBetsBB,
-    playerSeat
+    playerSeat,
+    currentHandId
   } = useGameStore();
   
   const [selectedAction, setSelectedAction] = useState<{action: string, betSize?: number} | null>(null);
@@ -161,6 +162,13 @@ export function ActionButtonsWithFrequencies() {
     return true;
   });
 
+  // Check if we have frequencies for all available actions
+  const hasFold = availableFrequencies.some(f => f.action === "fold");
+  const hasCheck = availableFrequencies.some(f => f.action === "check");
+  const hasCall = availableFrequencies.some(f => f.action === "call");
+  const hasBet = availableFrequencies.some(f => f.action === "bet");
+  const hasRaise = availableFrequencies.some(f => f.action === "raise");
+
   // Create default buttons if no frequencies calculated
   if (availableFrequencies.length === 0) {
     const defaultButtons: ActionFrequency[] = [];
@@ -210,7 +218,7 @@ export function ActionButtonsWithFrequencies() {
         action: "bet",
         betSize: allInSize,
         frequency: 0,
-        label: `ALLIN ${formatBB(allInSize)} BB`
+        label: `ALL-IN ${formatBB(allInSize)} BB`
       });
     }
     
@@ -307,12 +315,124 @@ export function ActionButtonsWithFrequencies() {
           action: "raise",
           betSize: allInSize,
           frequency: 0,
-          label: `ALLIN ${formatBB(allInSize)} BB`
+          label: `ALL-IN ${formatBB(allInSize)} BB`
         });
       }
     }
     
     availableFrequencies = defaultButtons;
+  } else {
+    // Merge missing actions with existing frequencies
+    const missingButtons: ActionFrequency[] = [];
+    
+    if (canBet && !hasBet) {
+      const betSizes = [
+        { size: Math.round((pot * 0.33) * 10) / 10 },
+        { size: Math.round((pot * 0.67) * 10) / 10 },
+        { size: Math.round((pot * 1.3) * 10) / 10 },
+      ];
+      
+      betSizes.forEach(betSize => {
+        missingButtons.push({
+          action: "bet",
+          betSize: betSize.size,
+          frequency: 0,
+          label: `BET ${formatBB(betSize.size)} BB`
+        });
+      });
+      
+      const allInSize = playerStackBB || pot * 10;
+      missingButtons.push({
+        action: "bet",
+        betSize: allInSize,
+        frequency: 0,
+        label: `ALL-IN ${formatBB(allInSize)} BB`
+      });
+    }
+    
+    if (canCheck && !hasCheck) {
+      missingButtons.push({
+        action: "check",
+        frequency: 0,
+        label: "CHECK"
+      });
+    }
+    
+    if (canCall && !hasCall) {
+      missingButtons.push({
+        action: "call",
+        frequency: 0,
+        label: `CALL ${currentBet > 0 ? `${formatBB(currentBet)} BB` : ""}`
+      });
+    }
+    
+    if (canFold && !hasFold) {
+      missingButtons.push({
+        action: "fold",
+        frequency: 0,
+        label: "FOLD"
+      });
+    }
+    
+    if (canRaise && !hasRaise) {
+      const minRaiseAmount = currentBet > 0 ? currentBet * 2 : bigBlind * 2;
+      const currentPlayerBet = playerBetsBB?.[playerSeat] || 0;
+      const remainingStack = Math.max(0, (playerStackBB || 100) - currentPlayerBet);
+      const raiseSizes: number[] = [];
+      
+      if (currentBet > 0) {
+        const increment = Math.max(bigBlind, Math.round(currentBet * 0.5 * 10) / 10);
+        const raise25x = Math.max(minRaiseAmount, Math.round(currentBet * 2.5 * 10) / 10);
+        if (raise25x > currentBet && !raiseSizes.includes(raise25x)) {
+          raiseSizes.push(raise25x);
+        }
+        const raise3x = Math.round(currentBet * 3 * 10) / 10;
+        if (raise3x > currentBet && !raiseSizes.includes(raise3x)) {
+          raiseSizes.push(raise3x);
+        }
+        const raise4x = Math.round(currentBet * 4 * 10) / 10;
+        if (raise4x > currentBet && !raiseSizes.includes(raise4x)) {
+          raiseSizes.push(raise4x);
+        }
+        const potRaise = Math.round((pot + currentBet) * 10) / 10;
+        if (potRaise > currentBet && !raiseSizes.includes(potRaise)) {
+          raiseSizes.push(potRaise);
+        }
+      } else {
+        const pot33 = Math.round((pot * 0.33) * 10) / 10;
+        const pot67 = Math.round((pot * 0.67) * 10) / 10;
+        const pot130 = Math.round((pot * 1.3) * 10) / 10;
+        if (pot33 >= minRaiseAmount && !raiseSizes.includes(pot33)) raiseSizes.push(pot33);
+        if (pot67 >= minRaiseAmount && pot67 !== pot33 && !raiseSizes.includes(pot67)) raiseSizes.push(pot67);
+        if (pot130 >= minRaiseAmount && pot130 !== pot67 && pot130 !== pot33 && !raiseSizes.includes(pot130)) raiseSizes.push(pot130);
+      }
+      
+      raiseSizes.sort((a, b) => a - b).forEach(raiseSize => {
+        const totalBetSize = raiseSize;
+        const raiseIncrement = totalBetSize - currentBet;
+        if (totalBetSize > currentBet && raiseIncrement <= remainingStack && totalBetSize <= (playerStackBB || 200)) {
+          missingButtons.push({
+            action: "raise",
+            betSize: totalBetSize,
+            frequency: 0,
+            label: `RAISE ${formatBB(totalBetSize)} BB`
+          });
+        }
+      });
+      
+      const allInSize = remainingStack + currentPlayerBet;
+      if (allInSize > currentBet && !raiseSizes.includes(allInSize) && allInSize > 0) {
+        missingButtons.push({
+          action: "raise",
+          betSize: allInSize,
+          frequency: 0,
+          label: `ALL-IN ${formatBB(allInSize)} BB`
+        });
+      }
+    }
+    
+    // Merge missing buttons with existing frequencies
+    availableFrequencies = [...availableFrequencies, ...missingButtons];
   }
 
   const handleActionClick = (frequency: ActionFrequency) => {
@@ -367,30 +487,40 @@ export function ActionButtonsWithFrequencies() {
   };
 
   const getActionButtonClass = (frequency: ActionFrequency, isSelected: boolean, isCorrect: boolean | null) => {
-    const baseClass = "relative py-4 px-4 text-base font-semibold rounded-lg transition-all duration-[220ms] border-2 w-full ";
+    // Fixed min-height to ensure consistent button sizes even when frequencies appear
+    const baseClass = "relative py-4 px-4 text-base font-semibold rounded-lg transition-all duration-[220ms] border-2 w-full min-h-[80px] flex flex-col items-center justify-center ";
     
     // Morphing animation classes
     const morphClass = animationPhase === "morphing" ? "scale-[1.02]" : animationPhase === "complete" ? "scale-100" : "scale-100";
     
+    // Check if this is the highest frequency action (for highlighting)
+    const isHighestFrequency = shouldShowFrequencies && 
+                               highestFrequencyAction &&
+                               frequency.action === highestFrequencyAction.action &&
+                               frequency.betSize === highestFrequencyAction.betSize;
+    
+    // Highlight highest frequency action with subtle border glow (only if not selected)
+    const highestFreqHighlight = isHighestFrequency && !isSelected ? " ring-2 ring-yellow-400/50 ring-offset-1" : "";
+    
     if (frequency.action === "fold") {
-      return baseClass + morphClass + (isSelected
+      return baseClass + morphClass + highestFreqHighlight + (isSelected
         ? (isCorrect ? " bg-gray-600 border-green-500 shadow-lg shadow-green-500/50" : " bg-gray-600 border-red-500 shadow-lg shadow-red-500/50")
         : " bg-gray-700 hover:bg-gray-600 border-gray-500");
     } else if (frequency.action === "check") {
-      return baseClass + morphClass + (isSelected
+      return baseClass + morphClass + highestFreqHighlight + (isSelected
         ? (isCorrect ? " bg-green-600 border-green-500 shadow-lg shadow-green-500/50" : " bg-green-600 border-red-500 shadow-lg shadow-red-500/50")
         : " bg-green-600 hover:bg-green-700 border-green-700");
     } else if (frequency.action === "call") {
-      return baseClass + morphClass + (isSelected
+      return baseClass + morphClass + highestFreqHighlight + (isSelected
         ? (isCorrect ? " bg-green-600 border-green-500 shadow-lg shadow-green-500/50" : " bg-green-600 border-red-500 shadow-lg shadow-red-500/50")
         : " bg-green-600 hover:bg-green-700 border-green-700");
     } else if (frequency.action === "bet" || frequency.action === "raise") {
       // All bet/raise buttons are red with hover effect similar to fold/check
-      return baseClass + morphClass + (isSelected
+      return baseClass + morphClass + highestFreqHighlight + (isSelected
         ? (isCorrect ? " bg-red-600 border-green-500 shadow-lg shadow-green-500/50" : " bg-red-600 border-red-500 shadow-lg shadow-red-500/50")
         : " bg-red-600 hover:bg-red-700 border-red-700");
     }
-    return baseClass + morphClass + "bg-gray-700 border-gray-600";
+    return baseClass + morphClass + highestFreqHighlight + " bg-gray-700 border-gray-600";
   };
 
   // Separate buttons into groups
@@ -401,13 +531,22 @@ export function ActionButtonsWithFrequencies() {
   const sortedRaiseBetButtons = [...raiseBetButtons].sort((a, b) => {
     const aSize = a.betSize || 0;
     const bSize = b.betSize || 0;
-    if (a.label.includes("ALLIN") && !b.label.includes("ALLIN")) return 1;
-    if (b.label.includes("ALLIN") && !a.label.includes("ALLIN")) return -1;
+    if (a.label.includes("ALL-IN") && !b.label.includes("ALL-IN")) return 1;
+    if (b.label.includes("ALL-IN") && !a.label.includes("ALL-IN")) return -1;
     return aSize - bSize;
   });
 
   // Show frequencies after user makes a choice
   const shouldShowFrequencies = isCorrect !== null && lastAction !== null && optimalActions.length > 0;
+
+  // Find highest frequency action for highlighting
+  const highestFrequency = shouldShowFrequencies && availableFrequencies.length > 0
+    ? Math.max(...availableFrequencies.map(f => f.frequency || 0))
+    : 0;
+  
+  const highestFrequencyAction = shouldShowFrequencies && highestFrequency > 0
+    ? availableFrequencies.find(f => (f.frequency || 0) === highestFrequency)
+    : null;
 
   // Calculate correctness level
   const correctnessLevel = getCorrectnessLevel(isCorrect, Math.abs(evLoss || 0));
@@ -421,7 +560,14 @@ export function ActionButtonsWithFrequencies() {
                      (freq.betSize ? betSizeBB === freq.betSize : true) &&
                      isCorrect !== null;
     
-    const showFrequency = shouldShowFrequencies && freq.frequency > 0;
+    // Show frequency on all buttons after player acts (including 0%)
+    const showFrequency = shouldShowFrequencies;
+    
+    // Check if this is the highest frequency action
+    const isHighestFrequency = shouldShowFrequencies && 
+                               highestFrequencyAction &&
+                               freq.action === highestFrequencyAction.action &&
+                               freq.betSize === highestFrequencyAction.betSize;
     
     return (
       <div key={`action-${idx}`} className="relative">
@@ -452,28 +598,48 @@ export function ActionButtonsWithFrequencies() {
           }}
           title={buttonsDisabled ? "Not your turn" : ""}
         >
-          {/* Action Label - fades out during morph */}
+          {/* Action Label - always visible, positioned at top */}
           <span 
-            className="font-semibold text-base transition-opacity duration-[100ms]"
+            className={`font-semibold text-base transition-opacity duration-[100ms] block ${
+              isSelected && !isCorrect ? "text-white brightness-110" : ""
+            }`}
             style={{
-              opacity: animationPhase === "morphing" || animationPhase === "complete" ? 0 : 1
+              opacity: 1 // Always visible, even for incorrect choices
             }}
           >
             {freq.label}
           </span>
           
-          {/* Frequency - fades in after morph */}
-          {showFrequency && (
-            <span 
-              className="text-xs font-normal absolute bottom-2 right-2 transition-opacity duration-[120ms]"
-              style={{
-                opacity: animationPhase === "complete" ? 0.9 : 0,
-                transitionTimingFunction: "cubic-bezier(0.33, 0.0, 0.67, 1.0)"
-              }}
-            >
-              {freq.frequency.toFixed(1)}%
-            </span>
-          )}
+          {/* Frequency - shows on all buttons after player acts, positioned below action name */}
+          {/* Always render to reserve space and maintain consistent button size */}
+          <span 
+            className={`text-xs font-medium transition-opacity duration-[120ms] block mt-1 ${
+              isHighestFrequency ? "text-yellow-300 font-bold" : 
+              (freq.frequency || 0) > 0 ? "text-gray-300" : "text-gray-500"
+            }`}
+            style={{
+              opacity: showFrequency && animationPhase === "complete" ? 1 : 0,
+              transitionTimingFunction: "cubic-bezier(0.33, 0.0, 0.67, 1.0)",
+              minHeight: "1rem", // Reserve space for frequency text
+              visibility: showFrequency ? "visible" : "hidden" // Hide but reserve space when not showing
+            }}
+          >
+            {(freq.frequency || 0).toFixed(1)}%
+          </span>
+          
+          {/* Solver-best indicator for highest frequency - positioned below frequency */}
+          {/* Always render to reserve space and maintain consistent button size */}
+          <span 
+            className="text-[10px] font-bold text-yellow-300 transition-opacity duration-[120ms] block mt-0.5"
+            style={{
+              opacity: isHighestFrequency && showFrequency && animationPhase === "complete" ? 1 : 0,
+              transitionTimingFunction: "cubic-bezier(0.33, 0.0, 0.67, 1.0)",
+              minHeight: "0.75rem", // Reserve space for solver-best text
+              visibility: isHighestFrequency && showFrequency ? "visible" : "hidden" // Hide but reserve space when not showing
+            }}
+          >
+            (solver-best)
+          </span>
           
           {/* Correctness indicators */}
           {isSelected && isCorrect && animationPhase === "complete" && (

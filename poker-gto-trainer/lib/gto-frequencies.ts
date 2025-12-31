@@ -103,13 +103,13 @@ export function calculateGTOFrequencies(
   // Add all-in option if it's a valid action
   // All-in typically has low frequency unless it's the only option
   if (optimalActions.includes("raise") || optimalActions.includes("bet")) {
-    const hasAllIn = frequencies.some(f => f.label.includes("ALLIN") || f.label.includes("AI"));
+    const hasAllIn = frequencies.some(f => f.label.includes("ALL-IN") || f.label.includes("AI"));
     if (!hasAllIn) {
       frequencies.push({
         action: "raise",
         betSize: 0, // Will be set to stack size
         frequency: 0, // Usually 0% unless it's optimal
-        label: "ALLIN"
+        label: "ALL-IN"
       });
     }
   }
@@ -234,13 +234,13 @@ export function getRealisticFrequencies(
   
   // Add all-in with 0% (unless it's the only option)
   if (optimalActions.includes("raise") || optimalActions.includes("bet")) {
-    const hasAllIn = frequencies.some(f => f.label.includes("ALLIN"));
+    const hasAllIn = frequencies.some(f => f.label.includes("ALL-IN"));
     if (!hasAllIn) {
       frequencies.push({
         action: "raise",
         betSize: 0,
         frequency: 0,
-        label: "ALLIN"
+        label: "ALL-IN"
       });
     }
   }

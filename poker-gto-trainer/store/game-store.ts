@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { Hand, Action, Position, generateRandomHand, getGTOAction, getPositionFromSeat, Card } from "@/lib/gto";
+import { Hand, Action, Position, generateRandomHand, getGTOAction, getPositionFromSeat, Card, formatHand } from "@/lib/gto";
 import { getGTOExplanation, GTOExplanation } from "@/lib/gto-explanations";
 import { analyzeBetSize, BetSizeAnalysis } from "@/lib/bet-sizing";
 import { analyzePostFlopBetSize, PostFlopBetSizeAnalysis } from "@/lib/postflop-bet-sizing";
@@ -70,12 +70,15 @@ type GameState = {
   evLoss: number; // EV loss for the last action (for correctness level determination)
   solverTree: SolverTree; // Solver tree for opponent decisions
   useSolverEngine: boolean; // Whether to use solver-driven opponent AI
+  currentHandId: string | null; // Track current hand for data collection
   
   // Training features (opt-in, never blocks input)
   customRange: Set<string>; // Selected hands for training (e.g., "AKo", "76s")
   useCustomRange: boolean; // Whether to use custom range for training feedback
   isPausedForReview: boolean; // Whether game is paused waiting for Continue button
   showEVPanel: boolean; // Whether to show EV panel
+  showPlayerHand: boolean; // Whether to show player's hand cards
+  canSelectRange: boolean; // Whether range selection is allowed (independent of hand state)
   
   // Actions
   setNumPlayers: (count: number) => void;
@@ -90,17 +93,13 @@ type GameState = {
   closeFeedbackModal: () => void;
   resetGame: () => void;
   loadOpponentStats: (jsonData: string) => void;
-  currentHandId: string | null; // Track current hand for data collection
-  // Training features (opt-in, never blocks input)
-  customRange: Set<string>; // Selected hands for training (e.g., "AKo", "76s")
-  useCustomRange: boolean; // Whether to use custom range for training feedback
-  isPausedForReview: boolean; // Whether game is paused waiting for Continue button
-  showEVPanel: boolean; // Whether to show EV panel
   // Training feature actions
   toggleHandInRange: (hand: string) => void;
   setUseCustomRange: (enabled: boolean) => void;
   setShowEVPanel: (show: boolean) => void;
   setPausedForReview: (paused: boolean) => void;
+  setShowPlayerHand: (show: boolean) => void;
+  setCanSelectRange: (canSelect: boolean) => void;
   userClickedContinue: () => void;
 };
 
@@ -169,6 +168,8 @@ export const useGameStore = create<GameState>((set) => ({
   useCustomRange: false,
   isPausedForReview: false,
   showEVPanel: false,
+  showPlayerHand: true, // Show hand by default
+  canSelectRange: true, // Allow range selection by default
 
   // Set number of players (minimum 2 to ensure at least one opponent)
   setNumPlayers: (count: number) => {
@@ -198,8 +199,23 @@ export const useGameStore = create<GameState>((set) => ({
     
     // Generate all hands at once to ensure no duplicate cards
     // Use weighted generation for player hand (more playable hands)
-    const allHands = generateUniqueHands(numPlayers, [], true);
+    // Apply custom range filter if enabled
+    const allHands = generateUniqueHands(
+      numPlayers, 
+      [], 
+      true, 
+      state.customRange, 
+      state.useCustomRange
+    );
     const playerHand = allHands[playerSeat];
+    
+    // Validate that player hand is in range if custom range is enabled
+    if (state.useCustomRange && state.customRange.size > 0 && playerHand) {
+      const handEncoding = formatHand(playerHand);
+      if (!state.customRange.has(handEncoding)) {
+        console.warn(`Generated hand ${handEncoding} is not in custom range, but continuing anyway`);
+      }
+    }
     
     // Create opponent hands array
     const opponentHands: (Hand | null)[] = allHands.map((hand, seat) => 
@@ -444,6 +460,7 @@ export const useGameStore = create<GameState>((set) => ({
       buttonSeat,
       actionToFace: finalActionToFace, // Need to call if there's a bet
       isPlayerTurn: true,
+      canSelectRange: false, // Lock range selection ONLY when actively making a decision (isPlayerTurn: true)
       activePlayers: numPlayers - finalFoldedPlayers.filter(f => f).length,
       foldedPlayers: finalFoldedPlayers, // Mark players who folded
       lastActorSeat: null,
@@ -498,8 +515,8 @@ export const useGameStore = create<GameState>((set) => ({
         state.gameStage === "preflop"
       );
       
-      const canBet = action === "bet" && availableActions.canBet;
-      const canRaise = action === "raise" && availableActions.canRaise;
+      const canBet = action === "bet" && availableActions.includes("bet");
+      const canRaise = action === "raise" && availableActions.includes("raise");
       
       if (!canBet && !canRaise) {
         console.warn("Action not available:", action);
@@ -739,6 +756,7 @@ export const useGameStore = create<GameState>((set) => ({
         postFlopExplanation: null, // Clear post-flop explanation on preflop action
         showFeedbackModal: false, // Don't show modal - feedback is integrated into buttons
         isPlayerTurn: false,
+        canSelectRange: true, // Unlock range selection when player's turn ends
         playerBetsBB: updatedBets,
         lastActorSeat: state.playerSeat, // Track who just acted
         actionHistory: newActionHistory,
@@ -958,7 +976,7 @@ export const useGameStore = create<GameState>((set) => ({
     if (state.useSolverEngine) {
       try {
         // Convert to action engine state
-        const engineState = convertToActionEngineState(state.solverTree);
+        const engineState = convertToActionEngineState();
         
         // CRITICAL: Use flawless villain engine for perfect behavior
         await runFlawlessVillainActions(engineState);
@@ -1190,7 +1208,7 @@ export const useGameStore = create<GameState>((set) => ({
     // If using solver engine, properly reset betting state
     if (state.useSolverEngine) {
       try {
-        const engineState = convertToActionEngineState(state.solverTree);
+        const engineState = convertToActionEngineState();
         engineState.street = nextStage;
         engineState.communityCards = updatedCommunityCards;
         resetBettingForNewStreet(engineState);
@@ -1211,6 +1229,7 @@ export const useGameStore = create<GameState>((set) => ({
       communityCards: updatedCommunityCards,
       actionToFace: initialActionToFace,
       isPlayerTurn: isPlayerFirst,
+      canSelectRange: true, // Allow range selection when not actively making a decision
       currentBet: 0,
       playerBetsBB: resetBets,
       lastActorSeat: null, // Reset last actor for new street
@@ -1294,6 +1313,7 @@ export const useGameStore = create<GameState>((set) => ({
             foldedPlayers: updatedFolded,
             actionToFace: "check",
             isPlayerTurn: true,
+            canSelectRange: false, // Lock range selection when it's player's turn
             // Reset feedback state for new action
             isCorrect: null,
             lastAction: null,
@@ -1305,6 +1325,7 @@ export const useGameStore = create<GameState>((set) => ({
           useGameStore.setState({
             actionToFace: "check",
             isPlayerTurn: true,
+            canSelectRange: false, // Lock range selection when it's player's turn
             // Reset feedback state for new action
             isCorrect: null,
             lastAction: null,
@@ -1387,6 +1408,14 @@ export const useGameStore = create<GameState>((set) => ({
   
   setShowEVPanel: (show: boolean) => {
     set({ showEVPanel: show });
+  },
+  
+  setShowPlayerHand: (show: boolean) => {
+    set({ showPlayerHand: show });
+  },
+  
+  setCanSelectRange: (canSelect: boolean) => {
+    set({ canSelectRange: canSelect });
   },
   
   setPausedForReview: (paused: boolean) => {

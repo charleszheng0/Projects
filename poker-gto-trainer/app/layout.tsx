@@ -9,6 +9,7 @@ import {
   UserButton,
 } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
+import { ClipboardPolyfill } from "@/components/clipboard-polyfill";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -34,48 +35,11 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang="en">
-        <head>
-          <script
-            dangerouslySetInnerHTML={{
-              __html: `
-                // Polyfill for navigator.clipboard to prevent errors in third-party scripts
-                if (typeof navigator !== 'undefined' && !navigator.clipboard) {
-                  navigator.clipboard = {
-                    writeText: function(text) {
-                      return new Promise(function(resolve, reject) {
-                        try {
-                          // Fallback to execCommand if clipboard API not available
-                          var textarea = document.createElement('textarea');
-                          textarea.value = text;
-                          textarea.style.position = 'fixed';
-                          textarea.style.left = '-999999px';
-                          document.body.appendChild(textarea);
-                          textarea.select();
-                          var success = document.execCommand('copy');
-                          document.body.removeChild(textarea);
-                          if (success) {
-                            resolve();
-                          } else {
-                            reject(new Error('Failed to copy text'));
-                          }
-                        } catch (err) {
-                          reject(err);
-                        }
-                      });
-                    },
-                    readText: function() {
-                      return Promise.reject(new Error('readText not supported'));
-                    }
-                  };
-                }
-              `,
-            }}
-          />
-        </head>
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
           suppressHydrationWarning
         >
+          <ClipboardPolyfill />
           <header className="fixed top-0 right-0 z-50 p-4 pr-6">
             <SignedOut>
               <div className="flex gap-3">

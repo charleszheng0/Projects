@@ -13,6 +13,7 @@ import { Navigation } from "@/components/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { RangeSelector } from "@/components/range-selector";
+import { CustomRangeIndicator } from "@/components/custom-range-indicator";
 import { EVPanel } from "@/components/ev-panel";
 
 export default function GamePage() {
@@ -44,6 +45,7 @@ export default function GamePage() {
             </div>
             <div className="flex items-center gap-4">
               <RangeSelector />
+              <CustomRangeIndicator />
               <EVPanel />
               <PlayerCountSelector />
               <Button

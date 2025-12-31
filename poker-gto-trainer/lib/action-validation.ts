@@ -134,7 +134,7 @@ export function getAvailableActions(
   playerCurrentBet: number,
   isPreflop: boolean
 ): Array<Action | BettingAction> {
-  const toCall = currentBet - playerCurrentBet;
+  const toCall = Math.max(0, currentBet - playerCurrentBet); // Ensure toCall is never negative
   const available: Array<Action | BettingAction> = [];
 
   if (isPreflop) {
@@ -151,7 +151,8 @@ export function getAvailableActions(
       // Facing a bet
       available.push("fold", "call", "raise");
     } else {
-      // No bet to face
+      // No bet to face - can check or bet
+      // CRITICAL: Always allow both check and bet when no bet to face
       available.push("check", "bet");
     }
   }

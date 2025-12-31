@@ -43,7 +43,7 @@ export function EVPanel() {
     
     const evs: Array<{ action: string; ev: number; label: string }> = [];
     
-    if (availableActions.canFold) {
+    if (availableActions.includes("fold")) {
       try {
         const ev = calculateEV(
           playerHand,
@@ -61,7 +61,7 @@ export function EVPanel() {
       }
     }
     
-    if (availableActions.canCall) {
+    if (availableActions.includes("call")) {
       try {
         const ev = calculateEV(
           playerHand,
@@ -79,7 +79,7 @@ export function EVPanel() {
       }
     }
     
-    if (availableActions.canCheck) {
+    if (availableActions.includes("check")) {
       try {
         const ev = calculateEV(
           playerHand,
@@ -97,7 +97,7 @@ export function EVPanel() {
       }
     }
     
-    if (availableActions.canBet) {
+    if (availableActions.includes("bet")) {
       // Sample bet sizes
       const betSizes = [pot * 0.33, pot * 0.5, pot * 0.75, pot];
       betSizes.forEach(size => {
@@ -119,7 +119,7 @@ export function EVPanel() {
       });
     }
     
-    if (availableActions.canRaise) {
+    if (availableActions.includes("raise")) {
       // Sample raise sizes
       const raiseSizes = [currentBet * 2, currentBet * 3, pot];
       raiseSizes.forEach(size => {

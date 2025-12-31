@@ -1,4 +1,4 @@
-import { Hand, Card } from "./gto";
+import { Hand, Card, formatHand } from "./gto";
 
 /**
  * Hand strength categories for weighted generation
@@ -172,10 +172,53 @@ function generateRandomHand(): Hand {
 }
 
 /**
+ * Generate a hand from a specific range (Set of hand encodings like "AKo", "76s", "22")
+ * Returns null if range is empty or no valid hand can be generated
+ */
+export function generateHandFromRange(
+  customRange: Set<string>,
+  usedCards: Set<string>,
+  maxAttempts: number = 200
+): Hand | null {
+  if (customRange.size === 0) {
+    return null; // Empty range
+  }
+
+  // Convert Set to array for random selection
+  const rangeArray = Array.from(customRange);
+  
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    // Pick a random hand encoding from the range
+    const handEncoding = rangeArray[Math.floor(Math.random() * rangeArray.length)];
+    const hand = parseHandString(handEncoding);
+    
+    if (!hand) continue; // Invalid encoding, try next
+    
+    // Check if cards are already used
+    const card1Key = `${hand.card1.rank}-${hand.card1.suit}`;
+    const card2Key = `${hand.card2.rank}-${hand.card2.suit}`;
+    
+    if (!usedCards.has(card1Key) && !usedCards.has(card2Key)) {
+      return hand; // Found a valid hand from range
+    }
+  }
+  
+  // Couldn't find a valid hand from range (all cards already used)
+  return null;
+}
+
+/**
  * Generate multiple unique hands (for dealing to all players)
  * Uses weighted generation for player hand, random for opponents
+ * Optionally filters player hand by custom range
  */
-export function generateUniqueHands(count: number, excludeCards: Card[] = [], useWeightedForPlayer: boolean = true): Hand[] {
+export function generateUniqueHands(
+  count: number, 
+  excludeCards: Card[] = [], 
+  useWeightedForPlayer: boolean = true,
+  customRange?: Set<string>,
+  useCustomRange: boolean = false
+): Hand[] {
   const ranks = ["2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K", "A"];
   const suits = ["hearts", "diamonds", "clubs", "spades"];
   
@@ -187,15 +230,41 @@ export function generateUniqueHands(count: number, excludeCards: Card[] = [], us
   const hands: Hand[] = [];
   
   for (let i = 0; i < count; i++) {
-    let hand: Hand;
+    let hand: Hand | null = null;
     let attempts = 0;
     
     do {
-      // Use weighted generation for first hand (player), random for others
-      if (i === 0 && useWeightedForPlayer) {
-        hand = generateWeightedRandomHand();
+      // For player hand (first hand), check if custom range should be used
+      if (i === 0 && useCustomRange && customRange && customRange.size > 0) {
+        // Try to generate from custom range (pass usedCards to avoid conflicts)
+        hand = generateHandFromRange(customRange, usedCards, 200);
+        
+        // If range generation failed, fall back to weighted/random
+        if (!hand) {
+          console.warn("Could not generate hand from custom range, falling back to default generation");
+          if (useWeightedForPlayer) {
+            hand = generateWeightedRandomHand();
+          } else {
+            hand = generateRandomHand();
+          }
+        }
       } else {
-        hand = generateRandomHand();
+        // Use weighted generation for first hand (player), random for others
+        if (i === 0 && useWeightedForPlayer) {
+          hand = generateWeightedRandomHand();
+        } else {
+          hand = generateRandomHand();
+        }
+      }
+      
+      if (!hand) {
+        attempts++;
+        if (attempts > 100) {
+          // Fallback: just generate any hand if we can't find unique cards
+          hand = generateRandomHand();
+          break;
+        }
+        continue;
       }
       
       // Check if cards are already used
@@ -216,7 +285,12 @@ export function generateUniqueHands(count: number, excludeCards: Card[] = [], us
       }
     } while (true);
     
-    hands.push(hand);
+    if (hand) {
+      hands.push(hand);
+    } else {
+      // Last resort: generate any hand
+      hands.push(generateRandomHand());
+    }
   }
   
   return hands;

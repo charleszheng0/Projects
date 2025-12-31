@@ -45,8 +45,8 @@ export function createDefaultSolverTree(): SolverTree {
     }));
     const boardKey = generateBoardKey(boardCards);
 
-    for (const heroPos of ["BTN", "BB"]) {
-      for (const villainPos of ["BB", "BTN"]) {
+    for (const heroPos of ["BTN", "BB"] as Position[]) {
+      for (const villainPos of ["BB", "BTN"] as Position[]) {
         if (heroPos === villainPos) continue;
         
         const positionKey = generatePositionKey(heroPos, villainPos, 2);

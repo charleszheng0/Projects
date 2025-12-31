@@ -11,7 +11,6 @@ export function Navigation() {
     { href: "/game", label: "Train" },
     { href: "/analytics", label: "Analytics" },
     { href: "/ranges", label: "Ranges" },
-    { href: "/simulator", label: "Simulator" },
     { href: "/dataset", label: "Dataset" },
   ];
 

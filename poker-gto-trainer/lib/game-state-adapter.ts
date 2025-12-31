@@ -7,9 +7,7 @@ import { useGameStore } from "@/store/game-store";
 /**
  * Convert Zustand game store state to ActionEngineGameState
  */
-export function convertToActionEngineState(
-  solverTree: SolverTree
-): ActionEngineGameState {
+export function convertToActionEngineState(): ActionEngineGameState {
   const state = useGameStore.getState();
   
   // Convert players array
@@ -52,7 +50,7 @@ export function convertToActionEngineState(
       action: a.action,
       betSize: a.betSize,
     })),
-    solverTree,
+    solverTree: state.solverTree,
   };
 }
 

@@ -3,6 +3,8 @@
 import { useGameStore } from "@/store/game-store";
 import { Button } from "./ui/button";
 import { useState, useEffect } from "react";
+import { bettingRoundClosed } from "@/lib/action-engine";
+import { convertToActionEngineState } from "@/lib/game-state-adapter";
 
 /**
  * Continue button that appears after user action
@@ -33,6 +35,11 @@ export function ContinueButton() {
   
   // Check if player folded
   const playerFolded = foldedPlayers?.[playerSeat] || false;
+  
+  // Check if river betting round is complete (hand is finished)
+  const state = useGameStore.getState();
+  const engineState = convertToActionEngineState();
+  const isRiverComplete = gameStage === "river" && bettingRoundClosed(engineState);
   
   const handleContinue = async () => {
     if (isProcessing) return;
@@ -85,9 +92,15 @@ export function ContinueButton() {
         .map((folded, seat) => !folded && seat !== stateAfterProcessing.playerSeat ? seat : null)
         .filter((seat): seat is number => seat !== null);
       
-      if (activeOpponents.length === 0) {
+      // Check if river is complete (hand finished)
+      const engineStateAfter = convertToActionEngineState();
+      const isRiverCompleteAfter = stateAfterProcessing.gameStage === "river" && bettingRoundClosed(engineStateAfter);
+      
+      if (isRiverCompleteAfter) {
+        // River complete - deal new hand
+        dealNewHand();
+      } else if (activeOpponents.length === 0) {
         // No active opponents - advance to next street
-        // advanceToNextStreet already resets feedback state
         advanceToNextStreet();
       } else {
         // Betting round closed but opponents still active - advance to next street
@@ -108,7 +121,7 @@ export function ContinueButton() {
         disabled={isProcessing}
         className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 text-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {isProcessing ? "Processing..." : playerFolded ? "New Hand" : "Continue"}
+        {isProcessing ? "Processing..." : (playerFolded || isRiverComplete) ? "Next Hand" : "Continue"}
       </Button>
     </div>
   );

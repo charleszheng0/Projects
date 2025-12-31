@@ -8,6 +8,8 @@ import { ActionIndicator } from "./action-indicator";
 import { FoldAnimation } from "./fold-animation";
 import { getPositionFromSeat } from "@/lib/gto";
 import { formatBB } from "@/lib/utils";
+import { getHandRankName } from "@/lib/hand-rank";
+import { Eye, EyeOff } from "lucide-react";
 
 export function PokerTable() {
   const { 
@@ -35,6 +37,8 @@ export function PokerTable() {
     isPlayerTurn,
     actionHistory,
     animationState,
+    showPlayerHand,
+    setShowPlayerHand,
   } = useGameStore();
 
   // Create array of player positions around the table
@@ -165,22 +169,47 @@ export function PokerTable() {
                 {/* Player hand cards - positioned near player seat */}
                 {isPlayerSeat && playerHand && (
                   <div className="flex gap-1 mb-1 relative">
-                    <PokerCard 
-                      card={playerHand.card1} 
-                      size="sm"
-                      className={dealingAnimation ? "animate-in fade-in slide-in-from-bottom duration-200" : ""}
-                      style={{
-                        animationDelay: dealingAnimation ? `${seat * 400}ms` : "0ms"
-                      }}
-                    />
-                    <PokerCard 
-                      card={playerHand.card2} 
-                      size="sm"
-                      className={dealingAnimation ? "animate-in fade-in slide-in-from-bottom duration-200" : ""}
-                      style={{
-                        animationDelay: dealingAnimation ? `${seat * 400 + 200}ms` : "0ms"
-                      }}
-                    />
+                    {showPlayerHand ? (
+                      <>
+                        <PokerCard 
+                          card={playerHand.card1} 
+                          size="sm"
+                          className={dealingAnimation ? "animate-in fade-in slide-in-from-bottom duration-200" : ""}
+                          style={{
+                            animationDelay: dealingAnimation ? `${seat * 400}ms` : "0ms"
+                          }}
+                        />
+                        <PokerCard 
+                          card={playerHand.card2} 
+                          size="sm"
+                          className={dealingAnimation ? "animate-in fade-in slide-in-from-bottom duration-200" : ""}
+                          style={{
+                            animationDelay: dealingAnimation ? `${seat * 400 + 200}ms` : "0ms"
+                          }}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <PokerCard 
+                          card={playerHand.card1} 
+                          size="sm"
+                          faceDown={true}
+                          className={dealingAnimation ? "animate-in fade-in slide-in-from-bottom duration-200" : ""}
+                          style={{
+                            animationDelay: dealingAnimation ? `${seat * 400}ms` : "0ms"
+                          }}
+                        />
+                        <PokerCard 
+                          card={playerHand.card2} 
+                          size="sm"
+                          faceDown={true}
+                          className={dealingAnimation ? "animate-in fade-in slide-in-from-bottom duration-200" : ""}
+                          style={{
+                            animationDelay: dealingAnimation ? `${seat * 400 + 200}ms` : "0ms"
+                          }}
+                        />
+                      </>
+                    )}
                   </div>
                 )}
                 
@@ -330,6 +359,29 @@ export function PokerTable() {
         
         {/* Visual bet indicators - chips shown at player positions, no text labels */}
       </div>
+      
+      {/* Hand strength indicator and toggle - bottom right */}
+      {playerHand && (
+        <div className="absolute bottom-4 right-4 flex items-center gap-2 bg-gray-900/90 backdrop-blur-sm border border-gray-700 rounded-lg px-3 py-2 shadow-lg">
+          {/* Hand strength indicator */}
+          <div className="text-white text-xs font-semibold">
+            {getHandRankName(playerHand, communityCards, gameStage)}
+          </div>
+          
+          {/* Toggle button - smaller */}
+          <button
+            onClick={() => setShowPlayerHand(!showPlayerHand)}
+            className="p-1 hover:bg-gray-700 rounded transition-colors"
+            title={showPlayerHand ? "Hide hand" : "Show hand"}
+          >
+            {showPlayerHand ? (
+              <Eye className="w-3 h-3 text-gray-300" />
+            ) : (
+              <EyeOff className="w-3 h-3 text-gray-400" />
+            )}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
