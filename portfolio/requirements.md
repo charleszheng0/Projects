@@ -1,0 +1,3 @@
+# I'm creating a portfolio website for myself. I'll plug in some information, but I want you to create it based off of Siddarth Bellad's portfolio website. https://siddharth-bellad-portfolio.vercel.app/ I need the incorporation of the cursor being able to affect the backdrop's graphics. 
+
+Like his sections, I'm going to need to create a resume, about, education, experience, projects, etc. On the other side, it should include resume link and intro of myself. 

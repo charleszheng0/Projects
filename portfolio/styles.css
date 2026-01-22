@@ -1,0 +1,179 @@
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  color-scheme: light;
+  --bg: #d9d1c7;
+  --text: #1b1b1b;
+  --muted: #4b4b4b;
+  --link: #1b1b1b;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  font-family: "Helvetica Neue", Arial, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+body {
+  overflow: hidden;
+}
+
+#backdrop {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+
+.page {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  grid-template-rows: 1fr auto;
+  padding: 48px 64px;
+  gap: 24px;
+}
+
+.top-right {
+  position: absolute;
+  top: 40px;
+  right: 56px;
+  text-align: right;
+}
+
+.name {
+  font-size: 56px;
+  font-weight: 700;
+  letter-spacing: -1px;
+}
+
+.tagline {
+  font-size: 12px;
+  letter-spacing: 2px;
+  margin-top: 4px;
+  color: var(--muted);
+}
+
+.top-links {
+  display: flex;
+  gap: 16px;
+  justify-content: flex-end;
+  margin-top: 20px;
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+
+.top-links a {
+  text-decoration: none;
+  color: var(--link);
+}
+
+.side-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding-top: 120px;
+}
+
+.side-nav a {
+  text-decoration: none;
+  color: var(--link);
+}
+
+.content {
+  align-self: center;
+  max-width: 520px;
+}
+
+.section {
+  margin-bottom: 32px;
+}
+
+.section h2 {
+  font-size: 14px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.section p {
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0;
+  color: var(--muted);
+}
+
+.footer {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.footer a {
+  color: var(--link);
+  text-decoration: none;
+}
+
+.footer-links {
+  display: flex;
+  gap: 20px;
+}
+
+.copyright {
+  color: var(--muted);
+}
+
+@media (max-width: 960px) {
+  body {
+    overflow: auto;
+  }
+
+  .page {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto 1fr auto;
+    padding: 32px 24px 48px;
+  }
+
+  .top-right {
+    position: static;
+    text-align: left;
+    order: 0;
+  }
+
+  .name {
+    font-size: 36px;
+  }
+
+  .side-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    padding-top: 16px;
+    gap: 12px;
+  }
+
+  .content {
+    max-width: 100%;
+  }
+
+  .footer {
+    flex-direction: column;
+    gap: 12px;
+  }
+}
