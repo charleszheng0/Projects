@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --bg: #020409;
+  --bg-soft: #0b1220;
+  --ink: #e6faff;
+  --muted: #9ba7b5;
+  --accent: #00ffc6;
+  --accent-blue: #00d4ff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  min-height: 100%;
+  background: radial-gradient(circle at top, var(--bg-soft), var(--bg));
+  color: var(--ink);
+  font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(255, 255, 255, 0.06), transparent 50%),
+    radial-gradient(circle at 50% 45%, transparent 0%, transparent 45%, rgba(2, 3, 10, 0.85) 70%, rgba(0, 0, 0, 0.95) 100%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image:
+    radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    radial-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 140px 140px, 200px 200px;
+  background-position: 0 0, 60px 80px;
+  opacity: 0.18;
+  pointer-events: none;
+  z-index: -1;
+}
+
+body.home-lock {
+  overflow: hidden;
+}
+
+body.home-lock .site-footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+a {
+  color: inherit;
+}
+
+.font-mono {
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, monospace;
+}
+
+.glass-panel {
+  backdrop-filter: blur(12px);
+  background: rgba(10, 15, 20, 0.55);
+  border: 1px solid rgba(0, 255, 200, 0.15);
+  box-shadow: 0 0 20px rgba(0, 255, 200, 0.05);
+}
+
+.hud-border {
+  border: 1px solid rgba(0, 255, 200, 0.2);
+  box-shadow: inset 0 0 12px rgba(0, 255, 200, 0.08);
+}
