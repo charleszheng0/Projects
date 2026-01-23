@@ -108,6 +108,49 @@ export function FeedbackModal() {
               </div>
             </div>
 
+            {/* Hand Strength Category & Street Info */}
+            {currentExplanation && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Hand Strength Category (preflop only) */}
+                {isPreflop && explanation?.handStrengthCategory && (
+                  <div className="bg-blue-900/30 rounded-lg p-4 border border-blue-700">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge variant="outline" className="bg-blue-600/20 text-blue-300 border-blue-500">
+                        Hand Category
+                      </Badge>
+                    </div>
+                    <h4 className="text-white font-semibold mb-1">
+                      {explanation.handStrengthDescription}
+                    </h4>
+                    <p className="text-gray-300 text-sm leading-relaxed">
+                      {explanation.handStrengthExplanation}
+                    </p>
+                  </div>
+                )}
+                
+                {/* Street Information */}
+                {(isPreflop && explanation?.streetNumber) || (!isPreflop && postFlopExplanation?.streetNumber) ? (
+                  <div className="bg-purple-900/30 rounded-lg p-4 border border-purple-700">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge variant="outline" className="bg-purple-600/20 text-purple-300 border-purple-500">
+                        Current Street
+                      </Badge>
+                    </div>
+                    <h4 className="text-white font-semibold mb-1">
+                      {isPreflop 
+                        ? explanation?.streetDescription 
+                        : postFlopExplanation?.streetDescription}
+                    </h4>
+                    <p className="text-gray-300 text-sm leading-relaxed">
+                      {isPreflop 
+                        ? explanation?.streetExplanation 
+                        : postFlopExplanation?.streetExplanation}
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            )}
+
             {/* Explanation */}
             {currentExplanation && (
               <>
@@ -122,7 +165,7 @@ export function FeedbackModal() {
                 <div className="space-y-2">
                   <h3 className="text-lg font-semibold text-white">Why This Decision is Correct:</h3>
                   <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
-                    <p className="text-gray-200 text-base leading-relaxed">
+                    <p className="text-gray-200 text-base leading-relaxed whitespace-pre-line">
                       {currentExplanation.reasoning}
                     </p>
                   </div>

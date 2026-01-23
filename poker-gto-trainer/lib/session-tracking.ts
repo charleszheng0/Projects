@@ -235,7 +235,7 @@ export class SessionManager {
     
     if (currentSessionId) {
       // Filter records that belong to this session (handId starts with sessionId)
-      const sessionRecords = allRecords.filter(r => r.handId.startsWith(currentSessionId));
+      const sessionRecords = allRecords.filter((r: HandHistoryRecord) => r.handId.startsWith(currentSessionId));
       if (sessionRecords.length > 0) {
         currentSession = calculateSessionStats(
           sessionRecords,

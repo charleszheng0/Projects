@@ -120,24 +120,11 @@ export function getGTOAction(
   };
 }
 
+import { generateWeightedRandomHand } from "./hand-generation";
+
 export function generateRandomHand(): Hand {
-  const ranks = ["2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K", "A"];
-  const suits = ["hearts", "diamonds", "clubs", "spades"];
-
-  const rank1 = ranks[Math.floor(Math.random() * ranks.length)];
-  const suit1 = suits[Math.floor(Math.random() * suits.length)];
-
-  let rank2: string;
-  let suit2: string;
-  do {
-    rank2 = ranks[Math.floor(Math.random() * ranks.length)];
-    suit2 = suits[Math.floor(Math.random() * suits.length)];
-  } while (rank1 === rank2 && suit1 === suit2);
-
-  return {
-    card1: { rank: rank1, suit: suit1 },
-    card2: { rank: rank2, suit: suit2 },
-  };
+  // Use weighted generation for better hand distribution (more playable hands)
+  return generateWeightedRandomHand();
 }
 
 export function getPositionFromSeat(seat: number, totalPlayers: number): Position {

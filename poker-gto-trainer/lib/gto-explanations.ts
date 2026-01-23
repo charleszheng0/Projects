@@ -1,11 +1,27 @@
 import { Hand, Position, Action } from "./gto";
 import { formatHand } from "./gto";
 import gtoRanges from "./gto-ranges.json";
+import { 
+  categorizeHandStrength, 
+  getHandStrengthDescription, 
+  getHandStrengthExplanation,
+  getStreetNumber,
+  getStreetDescription,
+  getStreetExplanation,
+  HandStrengthCategory,
+  StreetNumber
+} from "./hand-categorization";
 
 export interface GTOExplanation {
   correctActions: Action[];
   explanation: string;
   reasoning: string;
+  handStrengthCategory?: HandStrengthCategory;
+  handStrengthDescription?: string;
+  handStrengthExplanation?: string;
+  streetNumber?: StreetNumber;
+  streetDescription?: string;
+  streetExplanation?: string;
 }
 
 export function getGTOExplanation(
@@ -29,6 +45,7 @@ export function getGTOExplanation(
   const rank1Value = rankOrder.indexOf(rank1);
   const rank2Value = rankOrder.indexOf(rank2);
   const highRankValue = Math.max(rank1Value, rank2Value);
+  const lowRankValue = Math.min(rank1Value, rank2Value);
 
   // Get the base range action for comparison (to detect if hand became playable)
   const positionRanges = gtoRanges[position as keyof typeof gtoRanges] as Record<string, string>;
@@ -68,6 +85,16 @@ export function getGTOExplanation(
     ? "Middle position requires moderate ranges - tighter than late position but looser than early position."
     : "Blind positions have already invested chips, which improves pot odds but limits positional advantage.";
 
+  // Categorize hand strength
+  const handStrengthCategory = categorizeHandStrength(hand);
+  const handStrengthDescription = getHandStrengthDescription(handStrengthCategory);
+  const handStrengthExplanation = getHandStrengthExplanation(handStrengthCategory);
+  
+  // Get street information (preflop = first street)
+  const streetNumber = getStreetNumber("preflop");
+  const streetDescription = getStreetDescription(streetNumber);
+  const streetExplanation = getStreetExplanation(streetNumber);
+
   // Use the optimalActions passed in (from getGTOAction)
   const correctActions = optimalActions;
   let explanation = "";
@@ -97,8 +124,8 @@ export function getGTOExplanation(
         explanation = `${handString} is a premium ace hand.`;
         reasoning = `AK is one of the strongest non-pair hands preflop. It has high card value, pairs well, and can dominate weaker ace hands. Raising aggressively (or going all-in) maximizes value and puts maximum pressure on opponents. In ${position}, this aggressive play is optimal because you're likely ahead or have good equity even when behind.`;
         } else if (optimalAction === "raise") {
-          if (becamePlayable && isAce && highRankValue < rankOrder.indexOf("Q")) {
-            // Weak aces that became playable due to table size or position
+          if (becamePlayable && isAce && lowRankValue < rankOrder.indexOf("Q")) {
+            // Weak aces that became playable due to table size or position (A2-A9)
             explanation = `${handString} becomes playable ${isLatePosition ? "from late position" : `at a ${tableSize}-handed table`}.`;
             if (isHeadsUp) {
               reasoning = `Heads-up, almost any ace is playable. ${handString} has decent high card value and can dominate weaker hands. Raising builds the pot and puts pressure on your opponent. With only one opponent, the risk of being dominated is much lower.`;
@@ -110,13 +137,14 @@ export function getGTOExplanation(
           } else if (isPair && highRankValue >= rankOrder.indexOf("7") && highRankValue < rankOrder.indexOf("T")) {
             explanation = `${handString} is a medium pair.`;
             reasoning = `Medium pairs (77-99) have decent equity but are vulnerable to overcards. At a ${tableSize}-handed table, raising builds the pot when ahead and can force folds from weaker hands. ${isLatePosition ? "In late position, raising is optimal because you can control the pot and have position post-flop." : isEarlyPosition ? "In early position, raising is still correct for value, but you need to be cautious of stronger hands behind you." : "Raising is preferred over calling because it builds value and gives you initiative."} ${correctActions.includes("call") ? "However, calling can also be acceptable to control pot size." : ""}`;
-          } else if (isAce && highRankValue >= rankOrder.indexOf("Q")) {
+          } else if (isAce && lowRankValue >= rankOrder.indexOf("Q")) {
+            // Strong ace hands: AQ, AK (check low rank, not high rank, since Ace is always high)
             if (isSuited) {
               explanation = `${handString} is a strong ace-suited hand.`;
-              reasoning = `AQs has excellent high card value and flush potential. At a ${tableSize}-handed table, raising builds the pot and can get value from weaker hands. ${isLatePosition ? "In late position, raising is optimal because you have position and can control the pot post-flop." : isEarlyPosition ? "In early position, raising is correct for value, but you need to be prepared to fold if facing strong resistance." : "Raising is optimal because you have a strong hand that plays well post-flop and can dominate weaker ace hands."}`;
+              reasoning = `${handString} has excellent high card value and flush potential. At a ${tableSize}-handed table, raising builds the pot and can get value from weaker hands. ${isLatePosition ? "In late position, raising is optimal because you have position and can control the pot post-flop." : isEarlyPosition ? "In early position, raising is correct for value, but you need to be prepared to fold if facing strong resistance." : "Raising is optimal because you have a strong hand that plays well post-flop and can dominate weaker ace hands."}`;
             } else {
               explanation = `${handString} is a strong ace offsuit hand.`;
-              reasoning = `AQo has good high card value but is vulnerable to AK and pairs. ${isLatePosition ? "In late position, raising is optimal because you can control the pot and have position." : isEarlyPosition ? "In early position, raising is more marginal - you're building the pot but vulnerable to stronger hands behind you." : "Raising builds the pot when ahead, but you need to be cautious of stronger hands."} At a ${tableSize}-handed table, position significantly affects the playability of this hand. ${positionContext}`;
+              reasoning = `${handString} has good high card value but is vulnerable to AK and pairs. ${isLatePosition ? "In late position, raising is optimal because you can control the pot and have position." : isEarlyPosition ? "In early position, raising is more marginal - you're building the pot but vulnerable to stronger hands behind you." : "Raising builds the pot when ahead, but you need to be cautious of stronger hands."} At a ${tableSize}-handed table, position significantly affects the playability of this hand. ${positionContext}`;
             }
           } else if (!isAce && isSuited && highRankValue >= rankOrder.indexOf("K")) {
             explanation = `${handString} is a strong suited hand.`;
@@ -138,8 +166,8 @@ export function getGTOExplanation(
           }
         }
     } else if (optimalAction === "call") {
-      if (becamePlayable && isAce && highRankValue < rankOrder.indexOf("Q")) {
-        // Weak aces that became playable due to table size
+      if (becamePlayable && isAce && lowRankValue < rankOrder.indexOf("Q")) {
+        // Weak aces that became playable due to table size (A2-A9)
         explanation = `${handString} becomes playable at a ${tableSize}-handed table.`;
         if (isHeadsUp) {
           reasoning = `Heads-up, almost any ace is playable. ${handString} has decent high card value. Calling allows you to see a flop cheaply, and if you pair your ace, you can win a significant pot. With only one opponent, the risk is manageable.`;
@@ -151,13 +179,14 @@ export function getGTOExplanation(
       } else if (isPair && highRankValue < rankOrder.indexOf("7")) {
         explanation = `${handString} is a small pair.`;
         reasoning = `Small pairs (22-66) need to hit a set to be profitable. At a ${tableSize}-handed table, calling allows you to see a flop with good implied odds if you hit your set. In ${position}, calling is correct because the pot odds justify seeing a flop, and if you hit, you can win a large pot. ${correctActions.includes("fold") ? "However, folding can also be correct if pot odds aren't favorable." : ""}`;
-      } else if (isAce && highRankValue < rankOrder.indexOf("Q")) {
+      } else if (isAce && lowRankValue < rankOrder.indexOf("Q")) {
+        // Weak ace hands: A2-A9 (check low rank, not high rank)
         if (isSuited) {
           explanation = `${handString} is a playable ace-suited hand.`;
           reasoning = `Weak ace-suited hands have some value due to flush potential and high card value. At a ${tableSize}-handed table, calling allows you to see a flop cheaply. In ${position}, calling is acceptable because you have implied odds if you hit a flush or pair your ace.`;
         } else {
           explanation = `${handString} is a marginal ace offsuit hand.`;
-          reasoning = `Weak ace offsuit hands are easily dominated by stronger aces. At a ${tableSize}-handed table, calling is marginal and depends on pot odds. You're hoping to pair your ace or hit a straight, but you're vulnerable to being dominated. ${isHeadsUp ? "Heads-up, this is more playable." : isShortHanded ? "Short-handed, this becomes more acceptable." : ""}`;
+          reasoning = `Weak ace offsuit hands like ${handString} are easily dominated by stronger aces. At a ${tableSize}-handed table, calling is marginal and depends on pot odds. You're hoping to pair your ace or hit a straight, but you're vulnerable to being dominated. ${isHeadsUp ? "Heads-up, this is more playable." : isShortHanded ? "Short-handed, this becomes more acceptable." : ""}`;
         }
       } else if (!isAce && isSuited) {
         explanation = `${handString} is a suited hand.`;
@@ -218,10 +247,19 @@ export function getGTOExplanation(
     }
   }
 
+  // Add hand strength information to reasoning (but we'll display it separately in UI)
+  // Keep reasoning clean, we'll show category/street info in separate UI sections
+
   return {
     correctActions,
     explanation,
     reasoning,
+    handStrengthCategory,
+    handStrengthDescription,
+    handStrengthExplanation,
+    streetNumber,
+    streetDescription,
+    streetExplanation,
   };
 }
 

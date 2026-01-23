@@ -1,8 +1,15 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useGameStore } from "@/store/game-store";
 import { PokerCard } from "./poker-card";
 import { Badge } from "./ui/badge";
+import { ActionIndicator } from "./action-indicator";
+import { FoldAnimation } from "./fold-animation";
+import { getPositionFromSeat } from "@/lib/gto";
+import { formatBB } from "@/lib/utils";
+import { getHandRankName } from "@/lib/hand-rank";
+import { Eye, EyeOff } from "lucide-react";
 
 export function PokerTable() {
   const { 
@@ -26,6 +33,12 @@ export function PokerTable() {
     showFeedbackModal,
     foldedPlayers,
     lastActorSeat,
+    currentActorSeat,
+    isPlayerTurn,
+    actionHistory,
+    animationState,
+    showPlayerHand,
+    setShowPlayerHand,
   } = useGameStore();
 
   // Create array of player positions around the table
@@ -35,27 +48,71 @@ export function PokerTable() {
   const safePlayerStacksBB = playerStacksBB || Array(numPlayers).fill(100);
   const safePlayerBetsBB = playerBetsBB || Array(numPlayers).fill(0);
   const safeFoldedPlayers = foldedPlayers || Array(numPlayers).fill(false);
+  
+  // Animation states
+  const [dealingAnimation, setDealingAnimation] = useState(false);
+  const [potAnimation, setPotAnimation] = useState(false);
+  const [previousPot, setPreviousPot] = useState(pot);
+  
+  // Handle dealing animation when new hand starts
+  useEffect(() => {
+    if (playerHand && animationState === "dealing") {
+      setDealingAnimation(true);
+      const timer = setTimeout(() => {
+        setDealingAnimation(false);
+      }, numPlayers * 2 * 200 + 500); // 200ms per card, 2 cards per player + buffer
+      return () => clearTimeout(timer);
+    }
+  }, [playerHand, animationState, numPlayers]);
+  
+  // Handle pot update animation
+  useEffect(() => {
+    if (pot !== previousPot) {
+      setPotAnimation(true);
+      const timer = setTimeout(() => {
+        setPotAnimation(false);
+        setPreviousPot(pot);
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [pot, previousPot]);
 
   return (
     <div className="relative w-full max-w-4xl mx-auto aspect-[16/10]">
-      {/* Table surface */}
-      <div className="absolute inset-0 rounded-full bg-gradient-to-br from-green-800 to-green-900 border-8 border-gray-800 shadow-2xl">
-        {/* Inner table border */}
-        <div className="absolute inset-4 rounded-full border-2 border-green-700/50"></div>
+      {/* Table surface - GTO Wizard style: Dark charcoal/near-black */}
+      <div className="absolute inset-0 rounded-full bg-[#121212] border-4 border-[#1a1a1a]">
+        {/* Inner table border - subtle */}
+        <div className="absolute inset-2 rounded-full border border-[#1f1f1f]"></div>
         
-        {/* Center area for pot and community cards */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-4">
-          {/* Pot display */}
-          <div className="bg-green-700/80 rounded-full px-6 py-2 border-2 border-yellow-400">
-            <div className="text-yellow-300 text-xs font-semibold">Total Pot</div>
-            <div className="text-yellow-200 text-xl font-bold">{pot} BB</div>
+        {/* Center area for pot and community cards - GTO Wizard style */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-3">
+          {/* Pot display - Simple centered format like GTO Wizard */}
+          <div className={`text-white text-2xl font-semibold transition-all duration-200 ${
+            potAnimation ? "scale-110" : "scale-100"
+          }`}>
+            {formatBB(pot)} bb
           </div>
+          
+          {/* Current Bet to Call - Subtle below pot */}
+          {currentBet > 0 && (
+            <div className="text-gray-400 text-sm">
+              {formatBB(currentBet)} bb to call
+            </div>
+          )}
 
           {/* Community Cards - Only show community cards in center */}
           {communityCards.length > 0 && (
             <div className="flex gap-2">
               {communityCards.map((card, index) => (
-                <PokerCard key={index} card={card} size="md" />
+                <PokerCard 
+                  key={index} 
+                  card={card} 
+                  size="md"
+                  className="animate-in fade-in zoom-in duration-150"
+                  style={{
+                    animationDelay: `${index * 150}ms`
+                  }}
+                />
               ))}
             </div>
           )}
@@ -79,14 +136,17 @@ export function PokerTable() {
           const y = Math.sin(angle) * radius;
 
           const isPlayerSeat = seat === playerSeat;
-          const stackBB = safePlayerStacksBB[seat] || 100;
           const betBB = Math.max(0, safePlayerBetsBB[seat] || 0); // Ensure betBB is never negative
+          // Display stack minus current bet (chips already committed to pot)
+          const stackBB = Math.max(0, (safePlayerStacksBB[seat] || 100) - betBB);
+          const displayStack = formatBB(stackBB);
           const isSmallBlind = seat === smallBlindSeat;
           const isBigBlind = seat === bigBlindSeat;
           const isButton = seat === buttonSeat;
           const isFolded = safeFoldedPlayers[seat] || false;
           const isActive = !isFolded;
           const justActed = lastActorSeat === seat;
+          const isCurrentActor = currentActorSeat === seat;
 
           return (
             <div
@@ -108,65 +168,138 @@ export function PokerTable() {
                 
                 {/* Player hand cards - positioned near player seat */}
                 {isPlayerSeat && playerHand && (
-                  <div className="flex gap-1 mb-1">
-                    <PokerCard card={playerHand.card1} size="sm" />
-                    <PokerCard card={playerHand.card2} size="sm" />
+                  <div className="flex gap-1 mb-1 relative">
+                    {showPlayerHand ? (
+                      <>
+                        <PokerCard 
+                          card={playerHand.card1} 
+                          size="sm"
+                          className={dealingAnimation ? "animate-in fade-in slide-in-from-bottom duration-200" : ""}
+                          style={{
+                            animationDelay: dealingAnimation ? `${seat * 400}ms` : "0ms"
+                          }}
+                        />
+                        <PokerCard 
+                          card={playerHand.card2} 
+                          size="sm"
+                          className={dealingAnimation ? "animate-in fade-in slide-in-from-bottom duration-200" : ""}
+                          style={{
+                            animationDelay: dealingAnimation ? `${seat * 400 + 200}ms` : "0ms"
+                          }}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <PokerCard 
+                          card={playerHand.card1} 
+                          size="sm"
+                          faceDown={true}
+                          className={dealingAnimation ? "animate-in fade-in slide-in-from-bottom duration-200" : ""}
+                          style={{
+                            animationDelay: dealingAnimation ? `${seat * 400}ms` : "0ms"
+                          }}
+                        />
+                        <PokerCard 
+                          card={playerHand.card2} 
+                          size="sm"
+                          faceDown={true}
+                          className={dealingAnimation ? "animate-in fade-in slide-in-from-bottom duration-200" : ""}
+                          style={{
+                            animationDelay: dealingAnimation ? `${seat * 400 + 200}ms` : "0ms"
+                          }}
+                        />
+                      </>
+                    )}
                   </div>
                 )}
                 
                 {/* Opponent hand cards - face down */}
                 {!isPlayerSeat && opponentHands[seat] && !isFolded && (
-                  <div className="flex gap-1 mb-1">
-                    <PokerCard card={opponentHands[seat]!.card1} size="sm" faceDown={true} />
-                    <PokerCard card={opponentHands[seat]!.card2} size="sm" faceDown={true} />
+                  <div className="flex gap-1 mb-1 relative">
+                    <PokerCard 
+                      card={opponentHands[seat]!.card1} 
+                      size="sm" 
+                      faceDown={true}
+                      className={dealingAnimation ? "animate-in fade-in slide-in-from-bottom duration-200" : ""}
+                      style={{
+                        animationDelay: dealingAnimation ? `${seat * 400}ms` : "0ms"
+                      }}
+                    />
+                    <PokerCard 
+                      card={opponentHands[seat]!.card2} 
+                      size="sm" 
+                      faceDown={true}
+                      className={dealingAnimation ? "animate-in fade-in slide-in-from-bottom duration-200" : ""}
+                      style={{
+                        animationDelay: dealingAnimation ? `${seat * 400 + 200}ms` : "0ms"
+                      }}
+                    />
                   </div>
                 )}
                 
-                {/* Player info */}
+                {/* Fold animation overlay */}
+                {isFolded && (
+                  <FoldAnimation isFolding={isFolded} />
+                )}
+                
+                {/* Action indicator overlay - shows whose turn it is */}
+                {currentActorSeat === seat && !isFolded && (
+                  <ActionIndicator 
+                    isActive={true} 
+                    seat={seat}
+                    action={actionHistory[actionHistory.length - 1]?.action as any}
+                    betSize={actionHistory[actionHistory.length - 1]?.betSize}
+                  />
+                )}
+                
+                {/* Player info - GTO Wizard style: Circular orbs with rings */}
                 {isPlayerSeat ? (
-                  <div className={`rounded-lg px-3 py-1 border-2 ${
+                  <div className={`rounded-full w-16 h-16 flex flex-col items-center justify-center border-2 transition-all relative ${
                     isFolded 
-                      ? "bg-gray-900/80 border-gray-700 opacity-50" 
-                      : "bg-gray-800 border-yellow-400"
+                      ? "bg-gray-900/50 border-gray-700 opacity-40" 
+                      : isPlayerTurn || isCurrentActor
+                      ? "bg-[#1a1a1a] border-green-500 shadow-[0_0_20px_rgba(34,197,94,0.6)] ring-2 ring-green-500/50"
+                      : "bg-[#1a1a1a] border-green-500"
                   }`}>
-                    <div className="text-white text-xs font-semibold">You</div>
-                    <div className="text-yellow-300 text-xs">{playerStackBB} BB</div>
+                    <div className="text-white text-[10px] font-semibold">YOU</div>
+                    <div className="text-green-400 text-xs font-bold">
+                      {formatBB(Math.max(0, playerStackBB - (safePlayerBetsBB[playerSeat] || 0)))} BB
+                    </div>
                     {isFolded && (
-                      <div className="text-red-400 text-[10px] font-bold mt-0.5">FOLDED</div>
-                    )}
-                    {isActive && !isFolded && (
-                      <div className="text-green-400 text-[10px] font-semibold mt-0.5">ACTIVE</div>
-                    )}
-                    {justActed && !isFolded && (
-                      <div className="text-blue-300 text-[10px] font-bold mt-0.5 animate-pulse">BET</div>
+                      <div className="absolute -bottom-4 text-red-400 text-[9px] font-bold">FOLD</div>
                     )}
                   </div>
                 ) : (
-                  <div className={`rounded-lg px-3 py-1 border ${
+                  <div className={`rounded-full w-14 h-14 flex flex-col items-center justify-center border-2 transition-all relative ${
                     isFolded 
-                      ? "bg-gray-900/80 border-gray-700 opacity-50" 
+                      ? "bg-gray-900/50 border-gray-700 opacity-40" 
+                      : isCurrentActor
+                      ? "bg-[#1a1a1a] border-orange-500 shadow-[0_0_20px_rgba(249,115,22,0.6)] ring-2 ring-orange-500/50"
                       : justActed
-                      ? "bg-blue-900/80 border-blue-500 border-2"
-                      : "bg-gray-800/60 border-gray-600"
+                      ? "bg-[#1a1a1a] border-blue-500"
+                      : "bg-[#1a1a1a] border-gray-600"
                   }`}>
-                    <div className={`text-xs ${
+                    {/* Action indicator for opponents */}
+                    {isCurrentActor && !isFolded && (
+                      <ActionIndicator 
+                        isActive={true} 
+                        seat={seat}
+                        action={actionHistory[actionHistory.length - 1]?.action as any}
+                        betSize={actionHistory[actionHistory.length - 1]?.betSize}
+                      />
+                    )}
+                    <div className={`text-[10px] font-semibold ${
                       isFolded ? "text-gray-500" : "text-gray-300"
                     }`}>
-                      Player {seat + 1}
+                      {getPositionFromSeat(seat, numPlayers)}
                     </div>
-                    <div className={`text-xs ${
+                    <div className={`text-xs font-bold ${
                       isFolded ? "text-gray-600" : "text-gray-400"
                     }`}>
-                      {stackBB} BB
+                      {displayStack} BB
                     </div>
                     {isFolded && (
-                      <div className="text-red-400 text-[10px] font-bold mt-0.5">FOLDED</div>
-                    )}
-                    {isActive && !isFolded && (
-                      <div className="text-green-400 text-[10px] font-semibold mt-0.5">ACTIVE</div>
-                    )}
-                    {justActed && !isFolded && (
-                      <div className="text-blue-300 text-[10px] font-bold mt-0.5 animate-pulse">BET</div>
+                      <div className="absolute -bottom-4 text-red-400 text-[9px] font-bold">FOLD</div>
                     )}
                   </div>
                 )}
@@ -187,45 +320,35 @@ export function PokerTable() {
                 {betBB > 0 && !isFolded && (() => {
                   // Ensure at least 1 chip for any bet > 0
                   const chipCount = Math.max(1, Math.min(Math.ceil(betBB / 5), 5));
-                  const displayAmount = Math.round(betBB * 10) / 10; // Round to 1 decimal place
+                  const displayAmount = formatBB(betBB); // Format to avoid floating point issues
                   
                   return (
-                    <div className="relative flex items-center justify-center mt-1" style={{ height: '32px' }}>
+                    <div className="relative flex flex-col items-center justify-center mt-1 gap-1">
                       {/* Chip stack visualization - properly stacked */}
-                      {Array.from({ length: chipCount }).map((_, i) => {
-                        const offset = i * 2; // Small offset for stacking effect
-                        const rotation = i * 2; // Slight rotation for realism
-                        const isTopChip = i === chipCount - 1;
-                        
-                        return (
-                        <div
-                          key={i}
-                          className="absolute w-7 h-7 rounded-full border-2 border-yellow-300 bg-yellow-500 shadow-lg"
-                          style={{
-                            transform: `translateY(${-offset}px) rotate(${rotation}deg)`,
-                            zIndex: chipCount - i,
-                            bottom: 0,
-                          }}
-                        >
-                          <div className="w-full h-full rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center relative overflow-visible">
-                            {isTopChip && displayAmount > 0 && (
-                              <span 
-                                className="text-black text-[10px] font-bold leading-none select-none pointer-events-none whitespace-nowrap"
-                                style={{
-                                  transform: `rotate(${-rotation}deg)`, // Counter-rotate text to keep it readable
-                                  display: 'inline-block',
-                                  maxWidth: '100%',
-                                  textAlign: 'center',
-                                  lineHeight: '1',
-                                }}
-                              >
-                                {displayAmount}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      );
+                      <div className="relative flex items-center justify-center" style={{ height: '32px' }}>
+                        {Array.from({ length: chipCount }).map((_, i) => {
+                          const offset = i * 2; // Small offset for stacking effect
+                          const rotation = i * 2; // Slight rotation for realism
+                          
+                          return (
+                            <div
+                              key={i}
+                              className="absolute w-7 h-7 rounded-full border-2 border-yellow-300 bg-yellow-500 shadow-lg"
+                              style={{
+                                transform: `translateY(${-offset}px) rotate(${rotation}deg)`,
+                                zIndex: chipCount - i,
+                                bottom: 0,
+                              }}
+                            >
+                              <div className="w-full h-full rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600"></div>
+                            </div>
+                          );
                         })}
+                      </div>
+                      {/* Bet amount label below chips */}
+                      <div className="text-yellow-300 text-[10px] font-bold bg-yellow-900/80 px-2 py-0.5 rounded border border-yellow-600 whitespace-nowrap">
+                        {displayAmount} BB
+                      </div>
                     </div>
                   );
                 })()}
@@ -236,6 +359,29 @@ export function PokerTable() {
         
         {/* Visual bet indicators - chips shown at player positions, no text labels */}
       </div>
+      
+      {/* Hand strength indicator and toggle - bottom right */}
+      {playerHand && (
+        <div className="absolute bottom-4 right-4 flex items-center gap-2 bg-gray-900/90 backdrop-blur-sm border border-gray-700 rounded-lg px-3 py-2 shadow-lg">
+          {/* Hand strength indicator */}
+          <div className="text-white text-xs font-semibold">
+            {getHandRankName(playerHand, communityCards, gameStage)}
+          </div>
+          
+          {/* Toggle button - smaller */}
+          <button
+            onClick={() => setShowPlayerHand(!showPlayerHand)}
+            className="p-1 hover:bg-gray-700 rounded transition-colors"
+            title={showPlayerHand ? "Hide hand" : "Show hand"}
+          >
+            {showPlayerHand ? (
+              <Eye className="w-3 h-3 text-gray-300" />
+            ) : (
+              <EyeOff className="w-3 h-3 text-gray-400" />
+            )}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

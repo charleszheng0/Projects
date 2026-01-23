@@ -1,9 +1,18 @@
 import { Hand, Card } from "./gto";
 import { GameStage, BettingAction } from "./postflop-gto";
+import { 
+  getStreetNumber, 
+  getStreetDescription, 
+  getStreetExplanation,
+  StreetNumber 
+} from "./hand-categorization";
 
 export interface PostFlopExplanation {
   explanation: string;
   reasoning: string;
+  streetNumber?: StreetNumber;
+  streetDescription?: string;
+  streetExplanation?: string;
 }
 
 export function getPostFlopExplanation(
@@ -17,6 +26,11 @@ export function getPostFlopExplanation(
 ): PostFlopExplanation {
   const handDescription = getHandDescription(handStrength);
   const isInPosition = position === "BTN" || position === "CO";
+  
+  // Get street information
+  const streetNumber = getStreetNumber(stage);
+  const streetDescription = getStreetDescription(streetNumber);
+  const streetExplanation = getStreetExplanation(streetNumber);
   
   let explanation = "";
   let reasoning = "";
@@ -38,9 +52,15 @@ export function getPostFlopExplanation(
     reasoning = `With a ${handDescription}, folding is correct. You don't have enough equity to continue, and calling would be unprofitable.`;
   }
 
+  // Add street information to reasoning
+  reasoning = `${reasoning}\n\n**Current Street: ${streetDescription}**\n${streetExplanation}`;
+
   return {
     explanation,
     reasoning,
+    streetNumber,
+    streetDescription,
+    streetExplanation,
   };
 }
 
