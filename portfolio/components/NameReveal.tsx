@@ -13,7 +13,7 @@ export const NameReveal = memo(function NameReveal() {
       onHoverEnd={() => setHovered(false)}
     >
       <span className="text-5xl font-bold tracking-tight md:text-6xl">
-        CHARLES
+        charles
       </span>
       <AnimatePresence>
         {hovered && (
@@ -24,7 +24,7 @@ export const NameReveal = memo(function NameReveal() {
             transition={{ duration: 0.25 }}
             className="absolute left-full ml-2 text-5xl font-bold text-accent md:text-6xl"
           >
-            ZHENG
+            zheng
           </motion.span>
         )}
       </AnimatePresence>

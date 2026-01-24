@@ -137,7 +137,7 @@ export function NeuralBackground() {
         grid.set(key, bucket);
       }
 
-      ctx.strokeStyle = "rgba(160, 130, 255, 0.22)";
+      ctx.strokeStyle = "rgba(124, 77, 255, 0.22)";
       ctx.lineWidth = 0.7;
       for (let i = 0; i < state.particles.length; i += 1) {
         const p1 = state.particles[i];
@@ -172,8 +172,8 @@ export function NeuralBackground() {
       }
       ctx.globalAlpha = 1;
 
-      ctx.fillStyle = "rgba(180, 140, 255, 0.6)";
-      ctx.shadowColor = "rgba(180, 140, 255, 0.4)";
+      ctx.fillStyle = "rgba(124, 77, 255, 0.6)";
+      ctx.shadowColor = "rgba(124, 77, 255, 0.4)";
       ctx.shadowBlur = 8;
       for (const particle of state.particles) {
         ctx.beginPath();

@@ -14,7 +14,7 @@ type BrainCanvasProps = {
 };
 
 const BrainPoints = memo(function BrainPoints({
-  color = "#7CFFCB",
+  color = "#2AFFA9",
   speed = 0.0015,
   density = 3800,
   sensitivity = 0.15,
