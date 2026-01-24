@@ -1,6 +1,7 @@
 "use client";
 
 import { MotionReveal } from "./MotionReveal";
+import { useMemo, memo } from "react";
 
 type ScrollSectionsProps = {
   title?: string;
@@ -12,10 +13,11 @@ const items = Array.from({ length: 6 }, (_, index) => ({
   body: "Placeholder content for scroll depth and layout balance.",
 }));
 
-export function ScrollSections({
+export const ScrollSections = memo(function ScrollSections({
   title = "Additional Signals",
   count = 6,
 }: ScrollSectionsProps & { count?: number }) {
+  const displayItems = useMemo(() => items.slice(0, count), [count]);
   return (
     <section className="mt-16 grid gap-6">
       <MotionReveal>
@@ -24,7 +26,7 @@ export function ScrollSections({
         </h2>
       </MotionReveal>
       <div className="grid gap-4 md:grid-cols-2">
-        {items.slice(0, count).map((item, index) => (
+        {displayItems.map((item, index) => (
           <MotionReveal key={item.id} delay={index * 0.05}>
             <div className="hud-border bg-black/40 p-5 text-sm text-muted">
               <div className="mb-2 text-[10px] uppercase tracking-[0.3em] text-ink">
@@ -37,4 +39,4 @@ export function ScrollSections({
       </div>
     </section>
   );
-}
+});

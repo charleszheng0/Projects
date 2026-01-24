@@ -1,10 +1,15 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import dynamic from "next/dynamic";
 import { NavMenu } from "../components/NavMenu";
-import { NeuralBackground } from "../components/NeuralBackground";
 import { Footer } from "../components/Footer";
 import { BodyClass } from "../components/BodyClass";
+
+const NeuralBackground = dynamic(() => import("../components/NeuralBackground").then(mod => ({ default: mod.NeuralBackground })), {
+  ssr: false,
+  loading: () => null,
+});
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const jetbrains = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono" });

@@ -1,9 +1,9 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { useState } from "react";
+import { useState, memo } from "react";
 
-export function NameReveal() {
+export const NameReveal = memo(function NameReveal() {
   const [hovered, setHovered] = useState(false);
 
   return (
@@ -30,4 +30,4 @@ export function NameReveal() {
       </AnimatePresence>
     </motion.div>
   );
-}
+});

@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 
 export function NeuralBackground() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const rafRef = useRef<number>();
+  const lastMouseUpdate = useRef<number>(0);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext("2d", { alpha: true, desynchronized: true });
     if (!ctx) return;
 
     const state = {
@@ -186,10 +188,23 @@ export function NeuralBackground() {
       }
       ctx.shadowBlur = 0;
 
-      requestAnimationFrame(update);
+      rafRef.current = requestAnimationFrame(update);
+    };
+
+    let resizeTimeout: NodeJS.Timeout;
+    const handleResize = () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+        resize(media.matches);
+      }, 150);
     };
 
     const handlePointer = (event: MouseEvent) => {
+      const now = performance.now();
+      if (now - lastMouseUpdate.current < 16) return; // Throttle to ~60fps
+      lastMouseUpdate.current = now;
+      
       const rect = canvas.getBoundingClientRect();
       state.pointer.x = event.clientX - rect.left;
       state.pointer.y = event.clientY - rect.top;
@@ -204,15 +219,19 @@ export function NeuralBackground() {
     const applyMotion = () => resize(media.matches);
 
     applyMotion();
-    update();
+    rafRef.current = requestAnimationFrame(update);
 
-    window.addEventListener("resize", applyMotion);
-    window.addEventListener("mousemove", handlePointer);
+    window.addEventListener("resize", handleResize, { passive: true });
+    window.addEventListener("mousemove", handlePointer, { passive: true });
     window.addEventListener("mouseleave", clearPointer);
     media.addEventListener("change", applyMotion);
 
     return () => {
-      window.removeEventListener("resize", applyMotion);
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+      clearTimeout(resizeTimeout);
+      window.removeEventListener("resize", handleResize);
       window.removeEventListener("mousemove", handlePointer);
       window.removeEventListener("mouseleave", clearPointer);
       media.removeEventListener("change", applyMotion);

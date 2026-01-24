@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { memo, useMemo } from "react";
 
 const navLinks = [
   { label: "HOME", href: "/" },
@@ -10,7 +11,7 @@ const navLinks = [
   { label: "SKILLS", href: "/skills" },
 ];
 
-export function NavMenu() {
+export const NavMenu = memo(function NavMenu() {
   return (
     <header className="fixed left-6 right-6 top-6 z-30 flex items-center justify-between text-[11px] uppercase tracking-[0.3em] text-ink">
       <nav className="flex flex-wrap items-center gap-6">
@@ -33,4 +34,4 @@ export function NavMenu() {
       </Link>
     </header>
   );
-}
+});

@@ -1,9 +1,9 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, memo } from "react";
 
-export function BodyClass() {
+export const BodyClass = memo(function BodyClass() {
   const pathname = usePathname();
 
   useEffect(() => {
@@ -18,4 +18,4 @@ export function BodyClass() {
   }, [pathname]);
 
   return null;
-}
+});

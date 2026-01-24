@@ -1,6 +1,8 @@
 "use client";
 
-export function Footer() {
+import { memo } from "react";
+
+export const Footer = memo(function Footer() {
   return (
     <footer className="site-footer flex items-center justify-between px-6 pb-8 pt-12 text-[11px] uppercase tracking-[0.3em] text-muted md:px-16">
       <div className="text-left">czheng276@gmail.com</div>
@@ -14,4 +16,4 @@ export function Footer() {
       </div>
     </footer>
   );
-}
+});

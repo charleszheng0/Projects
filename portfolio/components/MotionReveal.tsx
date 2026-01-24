@@ -1,14 +1,14 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ReactNode } from "react";
+import { ReactNode, memo } from "react";
 
 type MotionRevealProps = {
   children: ReactNode;
   delay?: number;
 };
 
-export function MotionReveal({ children, delay = 0 }: MotionRevealProps) {
+export const MotionReveal = memo(function MotionReveal({ children, delay = 0 }: MotionRevealProps) {
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.96, filter: "blur(10px)" }}
@@ -19,4 +19,4 @@ export function MotionReveal({ children, delay = 0 }: MotionRevealProps) {
       {children}
     </motion.div>
   );
-}
+});

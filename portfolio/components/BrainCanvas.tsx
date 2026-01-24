@@ -3,7 +3,7 @@
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Points, PointMaterial } from "@react-three/drei";
 import { AdditiveBlending } from "three";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, memo } from "react";
 
 type BrainCanvasProps = {
   color?: string;
@@ -13,7 +13,7 @@ type BrainCanvasProps = {
   className?: string;
 };
 
-function BrainPoints({
+const BrainPoints = memo(function BrainPoints({
   color = "#7CFFCB",
   speed = 0.0015,
   density = 3800,
@@ -78,15 +78,17 @@ function BrainPoints({
     return { surfacePoints: surface, corePoints: core };
   }, [density, reducedMotion]);
 
+  const effectiveSpeed = useMemo(() => reducedMotion ? speed * 0.4 : speed, [reducedMotion, speed]);
+  const effectiveSensitivity = useMemo(() => reducedMotion ? sensitivity * 0.5 : sensitivity, [reducedMotion, sensitivity]);
+
   useFrame(({ clock, mouse }, delta) => {
     if (!ref.current) return;
     const t = clock.getElapsedTime();
-    const effectiveSpeed = reducedMotion ? speed * 0.4 : speed;
-    const effectiveSensitivity = reducedMotion ? sensitivity * 0.5 : sensitivity;
     ref.current.rotation.y += effectiveSpeed * delta;
     ref.current.rotation.x = mouse.y * effectiveSensitivity;
-    const lateral = mouse.x === 0 ? 0 : Math.sign(mouse.x);
-    ref.current.rotation.y += lateral * effectiveSensitivity * 0.06;
+    if (mouse.x !== 0) {
+      ref.current.rotation.y += Math.sign(mouse.x) * effectiveSensitivity * 0.06;
+    }
     const pulse = 1 + Math.sin(t * 1.2) * (reducedMotion ? 0.01 : 0.02);
     ref.current.scale.setScalar(pulse);
   });
@@ -115,16 +117,18 @@ function BrainPoints({
       </Points>
     </group>
   );
-}
+});
 
-export function BrainCanvas({ className, ...props }: BrainCanvasProps) {
+BrainPoints.displayName = "BrainPoints";
+
+export const BrainCanvas = memo(function BrainCanvas({ className, ...props }: BrainCanvasProps) {
   return (
     <div className={`relative h-[320px] w-full ${className ?? ""}`}>
-      <Canvas camera={{ position: [0, 0, 4], fov: 45 }}>
+      <Canvas camera={{ position: [0, 0, 4], fov: 45 }} dpr={[1, 2]}>
         <ambientLight intensity={0.5} />
         <pointLight position={[5, 5, 5]} intensity={1.2} />
         <BrainPoints {...props} />
       </Canvas>
     </div>
   );
-}
+});
