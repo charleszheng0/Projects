@@ -20,7 +20,7 @@ export default function AboutPage() {
                 src="/profile.jpg"
                 alt="Charles Zheng"
                 fill
-                className="rounded-full object-cover"
+                className="rounded-full object-cover object-[center_20%]"
                 sizes="(max-width: 768px) 180px, 240px"
               />
             </div>
