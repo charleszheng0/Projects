@@ -1,0 +1,373 @@
+/* Resume Optimizer Styles */
+
+.optimizer-app {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  color: #1f2937;
+}
+
+.app-header {
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.app-header h1 {
+  font-size: 2.5rem;
+  color: #111827;
+  margin-bottom: 1.5rem;
+}
+
+/* Step Indicator */
+.step-indicator {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+}
+
+.step-dot {
+  padding: 0.5rem 1rem;
+  border-radius: 9999px;
+  background: #e5e7eb;
+  color: #6b7280;
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.step-dot.active {
+  background: #2563eb;
+  color: white;
+}
+
+.step-line {
+  flex: 0 0 50px;
+  height: 2px;
+  background: #e5e7eb;
+}
+
+.step-line.active {
+  background: #2563eb;
+}
+
+/* Animations */
+.fade-in {
+  animation: fadeIn 0.5s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Step Containers */
+.step-container {
+  background: white;
+  padding: 2rem;
+  border-radius: 1rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  max-width: 800px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.step-container.full-width {
+  max-width: 100%;
+}
+
+.subtitle {
+  color: #6b7280;
+  margin-bottom: 2rem;
+}
+
+/* Upload Zone */
+.upload-dropzone {
+  border: 2px dashed #d1d5db;
+  border-radius: 1rem;
+  padding: 4rem 2rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #f9fafb;
+}
+
+.upload-dropzone:hover {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.upload-dropzone .icon {
+  font-size: 3rem;
+  display: block;
+  margin-bottom: 1rem;
+}
+
+.upload-dropzone.processing {
+  cursor: wait;
+}
+
+/* Job Input */
+.job-textarea {
+  width: 100%;
+  padding: 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  font-family: monospace;
+  font-size: 0.9rem;
+  resize: vertical;
+}
+
+.input-group {
+  margin-bottom: 2rem;
+}
+
+/* Buttons */
+.button-group {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+button {
+  cursor: pointer;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  transition: all 0.2s;
+  border: none;
+}
+
+.primary-button {
+  background: #2563eb;
+  color: white;
+}
+
+.primary-button:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.secondary-button {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.secondary-button:hover:not(:disabled) {
+  background: #e5e7eb;
+}
+
+.tertiary-button {
+  background: transparent;
+  color: #6b7280;
+  text-decoration: underline;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Processing View */
+.processing-view {
+  text-align: center;
+  padding: 4rem 2rem;
+}
+
+.spinner-large {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #e5e7eb;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 2rem;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #e5e7eb;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  display: inline-block;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.checklist {
+  list-style: none;
+  padding: 0;
+  max-width: 300px;
+  margin: 2rem auto 0;
+  text-align: left;
+}
+
+.checklist li {
+  padding: 0.5rem 0;
+  color: #9ca3af;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.checklist li.active {
+  color: #2563eb;
+  font-weight: bold;
+}
+
+.checklist li.done {
+  color: #10b981;
+}
+
+.checklist li.done::before {
+  content: "✓";
+}
+
+/* Comparison View */
+.comparison-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.view-controls {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.view-btn {
+  background: white;
+  border: 1px solid #d1d5db;
+  padding: 0.5rem 1rem;
+}
+
+.view-btn.active {
+  background: #2563eb;
+  color: white;
+  border-color: #2563eb;
+}
+
+.resume-paper {
+  background: white;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  padding: 3rem;
+  max-width: 850px; /* Letter size approx width on screen */
+  margin: 0 auto;
+  text-align: left;
+  border: 1px solid #e5e7eb;
+}
+
+.resume-header {
+  text-align: center;
+  margin-bottom: 2rem;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 1rem;
+}
+
+.resume-section {
+  margin-bottom: 1.5rem;
+}
+
+.resume-section h3 {
+  text-transform: uppercase;
+  border-bottom: 1px solid #000;
+  font-size: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.job-entry, .edu-entry {
+  margin-bottom: 1rem;
+}
+
+.job-header {
+  display: flex;
+  justify-content: space-between;
+}
+
+.job-sub {
+  font-style: italic;
+  color: #4b5563;
+  margin-bottom: 0.25rem;
+}
+
+ul {
+  padding-left: 1.2rem;
+  margin: 0;
+}
+
+li {
+  margin-bottom: 0.25rem;
+}
+
+/* Optimization Report */
+.analysis-panel {
+  max-width: 800px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.score-card {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  background: #f0f9ff;
+  padding: 2rem;
+  border-radius: 1rem;
+  margin-bottom: 2rem;
+}
+
+.score-circle {
+  background: white;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border: 4px solid #2563eb;
+}
+
+.score-val {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #2563eb;
+}
+
+.score-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.score-metrics {
+  flex: 1;
+}
+
+.metric {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #bfdbfe;
+}
+
+.report-section {
+  margin-bottom: 2rem;
+}
+
+.report-section ul {
+  list-style: none;
+  padding: 0;
+}
+
+.report-section li {
+  background: #f9fafb;
+  padding: 0.75rem;
+  margin-bottom: 0.5rem;
+  border-radius: 0.5rem;
+}
