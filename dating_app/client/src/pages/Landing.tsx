@@ -3,12 +3,12 @@ import { Link } from 'react-router-dom';
 
 const Landing = () => {
     return (
-        <div className="flex flex-col min-h-screen bg-cinematic-beige text-deep-charcoal">
+        <div className="flex flex-col min-h-screen bg-[#F5F1E8] text-[#2E2E2E]">
             <header className="p-6 flex justify-between items-center max-w-6xl mx-auto w-full">
                 <h1 className="text-2xl font-serif font-bold tracking-tight">The Immunity Date</h1>
                 <div className="space-x-4">
                     <Link to="/login" className="px-4 py-2 hover:opacity-70">Login</Link>
-                    <Link to="/signup" className="px-5 py-2 bg-deep-charcoal text-white rounded-full hover:bg-opacity-90 transition">
+                    <Link to="/signup" className="px-5 py-2 bg-[#2E2E2E] text-white rounded-full hover:bg-opacity-90 transition">
                         Join
                     </Link>
                 </div>
@@ -24,7 +24,7 @@ const Landing = () => {
                         Broadcast 1 hour of unscripted life to exist here.
                         Matches don't swipe — they witness.
                     </p>
-                    <Link to="/signup" className="px-8 py-4 bg-deep-charcoal text-cinematic-beige text-lg rounded-full font-medium hover:scale-105 transition-transform duration-300">
+                    <Link to="/signup" className="px-8 py-4 bg-[#2E2E2E] text-[#F5F1E8] text-lg rounded-full font-medium hover:scale-105 transition-transform duration-300">
                         Start Your Life Stream
                     </Link>
                 </div>
