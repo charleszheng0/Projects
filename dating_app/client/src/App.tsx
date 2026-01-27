@@ -1,36 +1,31 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
-import ProtectedRoute from './components/ProtectedRoute';
 import Landing from './pages/Landing';
-import Login from './pages/Auth';
-import Dashboard from './pages/Dashboard';
-import Pool from './pages/Pool';
-import Windows from './pages/Windows';
-import WindowDetail from './pages/WindowDetail';
-
-// Placeholder components if they don't exist yet (to allow build)
-// Note: I will create them next.
+import Onboarding from './pages/Onboarding';
+import Discovery from './pages/Discovery';
+import Matches from './pages/Matches';
+import Chat from './pages/Chat';
+import Profile from './pages/Profile';
+import MyProfile from './pages/MyProfile';
+import Settings from './pages/Settings';
+import Navigation from './components/Navigation';
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <div className="min-h-screen bg-stone-100 text-stone-800 font-sans">
-          <Routes>
-            <Route path="/" element={<Landing />} />
-            <Route path="/login" element={<Login isSignup={false} />} />
-            <Route path="/signup" element={<Login isSignup={true} />} />
-
-            <Route element={<ProtectedRoute />}>
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/pool" element={<Pool />} />
-              <Route path="/windows" element={<Windows />} />
-              <Route path="/windows/:id" element={<WindowDetail />} />
-            </Route>
-          </Routes>
-        </div>
-      </Router>
-    </AuthProvider>
+    <Router>
+      <div className="min-h-screen bg-[#f8f7f4] text-slate-900">
+        <Navigation />
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/discovery" element={<Discovery />} />
+          <Route path="/matches" element={<Matches />} />
+          <Route path="/chat/:id" element={<Chat />} />
+          <Route path="/profile/:id" element={<Profile />} />
+          <Route path="/me" element={<MyProfile />} />
+          <Route path="/settings" element={<Settings />} />
+        </Routes>
+      </div>
+    </Router>
   );
 }
 

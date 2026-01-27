@@ -1,55 +1,133 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from "react-router-dom";
 
 const Landing = () => {
-    return (
-        <div className="flex flex-col min-h-screen bg-[#F5F1E8] text-[#2E2E2E]">
-            <header className="p-6 flex justify-between items-center max-w-6xl mx-auto w-full">
-                <h1 className="text-2xl font-serif font-bold tracking-tight">The Immunity Date</h1>
-                <div className="space-x-4">
-                    <Link to="/login" className="px-4 py-2 hover:opacity-70">Login</Link>
-                    <Link to="/signup" className="px-5 py-2 bg-[#2E2E2E] text-white rounded-full hover:bg-opacity-90 transition">
-                        Join
-                    </Link>
-                </div>
-            </header>
-
-            <main className="flex-grow flex flex-col justify-center items-center text-center p-6 bg-[url('https://www.transparenttextures.com/patterns/dust.png')]">
-                <div className="max-w-2xl animate-fade-in-up">
-                    <h2 className="text-5xl md:text-7xl font-serif mb-6 leading-tight">
-                        No filters.<br />No chasing.
-                    </h2>
-                    <p className="text-xl md:text-2xl mb-12 font-light opacity-80 max-w-xl mx-auto">
-                        A radical transparency dating app.
-                        Broadcast 1 hour of unscripted life to exist here.
-                        Matches don't swipe — they witness.
-                    </p>
-                    <Link to="/signup" className="px-8 py-4 bg-[#2E2E2E] text-[#F5F1E8] text-lg rounded-full font-medium hover:scale-105 transition-transform duration-300">
-                        Start Your Life Stream
-                    </Link>
-                </div>
-
-                <div className="mt-20 grid grid-cols-1 md:grid-cols-3 gap-12 max-w-5xl text-left opacity-90">
-                    <div>
-                        <h3 className="font-serif text-2xl mb-2">Life Streams</h3>
-                        <p>You are only visible when you share 1 hour of real life daily. No curated profiles.</p>
-                    </div>
-                    <div>
-                        <h3 className="font-serif text-2xl mb-2">Shared Windows</h3>
-                        <p>Connect for 48 hours. Watch daily rhythms. Then the window closes automatically.</p>
-                    </div>
-                    <div>
-                        <h3 className="font-serif text-2xl mb-2">No Ghosting</h3>
-                        <p>Endings are built-in. If you don't both say "Yes" to renew, it simply ends.</p>
-                    </div>
-                </div>
-            </main>
-
-            <footer className="p-6 text-center opacity-50 text-sm">
-                &copy; {new Date().getFullYear()} The Immunity Date. Radical Transparency.
-            </footer>
+  return (
+    <div className="min-h-screen bg-[#f8f7f4] text-slate-900">
+      <header className="px-6 py-6 max-w-6xl mx-auto flex items-center justify-between">
+        <div>
+          <p className="text-sm uppercase tracking-[0.3em] text-slate-400">
+            Koina
+          </p>
+          <h1 className="text-2xl font-semibold text-[#1e40af]">
+            Accountability-first dating
+          </h1>
         </div>
-    );
+        <div className="flex items-center gap-3">
+          <Link
+            to="/discovery"
+            className="px-4 py-2 text-sm font-semibold text-[#1e40af] hover:underline"
+          >
+            Explore
+          </Link>
+          <Link
+            to="/onboarding"
+            className="px-5 py-2 rounded-full bg-[#1e40af] text-white text-sm font-semibold shadow hover:opacity-90"
+          >
+            Start your profile
+          </Link>
+        </div>
+      </header>
+
+      <main className="max-w-6xl mx-auto px-6 py-12">
+        <div className="grid gap-12 md:grid-cols-[1.2fr_1fr] items-center">
+          <div className="space-y-6">
+            <h2 className="text-4xl md:text-6xl font-semibold leading-tight">
+              No ghosting. No filters. Just radical transparency.
+            </h2>
+            <p className="text-lg text-slate-600">
+              Build connections that last with public accountability scores,
+              personality-first matching, and verified honesty. Photos unlock
+              after real conversation.
+            </p>
+            <div className="flex flex-wrap gap-4">
+              <Link
+                to="/onboarding"
+                className="px-6 py-3 rounded-full bg-[#f97316] text-white font-semibold shadow hover:opacity-90"
+              >
+                Begin onboarding
+              </Link>
+              <Link
+                to="/discovery"
+                className="px-6 py-3 rounded-full border border-slate-300 text-slate-700 font-semibold hover:bg-slate-100"
+              >
+                View the discovery feed
+              </Link>
+            </div>
+            <div className="flex flex-wrap gap-6 text-sm text-slate-500">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">✅</span>
+                Public accountability scores
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-lg">🎤</span>
+                Voice intro before photos
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-lg">📹</span>
+                Video verification required
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-3xl shadow-xl border border-slate-200 p-6 space-y-5">
+            <h3 className="text-lg font-semibold text-slate-800">
+              How Koina works
+            </h3>
+            <ol className="space-y-4 text-slate-600">
+              <li>
+                <span className="font-semibold text-slate-800">1.</span> Build a
+                personality-first profile and complete the radical honesty
+                prompts.
+              </li>
+              <li>
+                <span className="font-semibold text-slate-800">2.</span> Match
+                based on values and communication, not photos.
+              </li>
+              <li>
+                <span className="font-semibold text-slate-800">3.</span> Earn
+                accountability scores that protect everyone from ghosting.
+              </li>
+              <li>
+                <span className="font-semibold text-slate-800">4.</span> Unlock
+                photos after 20 messages or mutual agreement.
+              </li>
+            </ol>
+          </div>
+        </div>
+
+        <section className="mt-16 grid gap-6 md:grid-cols-3">
+          {[
+            {
+              title: "Public Ghosting Scores",
+              text: "Every profile shows communication reliability, response history, and verified date follow-through.",
+            },
+            {
+              title: "Photos After Personality",
+              text: "Match on voice and values first. Photos unlock only after trust-building.",
+            },
+            {
+              title: "Radical Transparency",
+              text: "Mandatory vulnerability prompts + video verification keep profiles honest.",
+            },
+          ].map((feature) => (
+            <div
+              key={feature.title}
+              className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm"
+            >
+              <h4 className="text-lg font-semibold text-slate-900">
+                {feature.title}
+              </h4>
+              <p className="mt-2 text-slate-600">{feature.text}</p>
+            </div>
+          ))}
+        </section>
+      </main>
+
+      <footer className="px-6 py-10 text-center text-xs text-slate-400">
+        &copy; {new Date().getFullYear()} Koina. Honest dating, finally.
+      </footer>
+    </div>
+  );
 };
 
 export default Landing;
