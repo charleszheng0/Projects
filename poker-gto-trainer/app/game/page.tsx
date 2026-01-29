@@ -4,22 +4,25 @@ import { useEffect, useState } from "react";
 import { useGameStore } from "@/store/game-store";
 import { PokerTable } from "@/components/poker-table";
 import { ActionButtonsWithFrequencies } from "@/components/action-buttons-with-frequencies";
-import { BetSizingModal } from "@/components/bet-sizing-modal";
+import { ContinueButton } from "@/components/continue-button";
 import { PlayerCountSelector } from "@/components/player-count-selector";
 import { HandHistoryReview } from "@/components/hand-history-review";
 import { ActionHistoryBar } from "@/components/action-history-bar";
-import { GTOSidebar } from "@/components/gto-sidebar";
 import { Navigation } from "@/components/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { RangeSelector } from "@/components/range-selector";
-import { CustomRangeIndicator } from "@/components/custom-range-indicator";
-import { EVPanel } from "@/components/ev-panel";
+import { getArchetypeLabel, OpponentArchetype } from "@/lib/leak-weighting";
 
 export default function GamePage() {
   const { 
     dealNewHand, 
     currentHandId,
+    opponentArchetype,
+    strategyMode,
+    showEVDecimals,
+    setOpponentArchetype,
+    setStrategyMode,
+    setShowEVDecimals,
   } = useGameStore();
   
   const [showHandReview, setShowHandReview] = useState(false);
@@ -32,21 +35,61 @@ export default function GamePage() {
 
   return (
     <div className="min-h-screen bg-[#0f0f0f] flex flex-col">
-      {/* Action History Bar - GTO Wizard Style Top Breadcrumb */}
-      <ActionHistoryBar />
-      
-      {/* Top Bar - GTO Wizard Style */}
       <div className="bg-[#0f0f0f] border-b border-gray-800 sticky top-0 z-40">
         <div className="max-w-[1920px] mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-6">
-              <h1 className="text-xl font-bold text-white">Poker GTO Trainer</h1>
-              <Navigation />
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="font-brand text-lg font-bold tracking-wide text-white">
+                  Varion Poker
+                </span>
+              </div>
             </div>
-            <div className="flex items-center gap-4">
-              <RangeSelector />
-              <CustomRangeIndicator />
-              <EVPanel />
+
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+              <Navigation />
+              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-gray-800 bg-[#121212] px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-gray-400">Opponent</label>
+                  <select
+                    value={opponentArchetype}
+                    onChange={(event) => setOpponentArchetype(event.target.value as OpponentArchetype)}
+                    className="bg-[#0f0f0f] text-sm text-gray-200 border border-gray-700 rounded px-2 py-1"
+                  >
+                    {(["SOLVER_LIKE", "OVER_FOLDS", "STATION", "SCARED_MONEY", "OVER_AGGRO"] as const).map((type) => (
+                      <option key={type} value={type}>
+                        {getArchetypeLabel(type)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex items-center gap-1 border border-gray-700 rounded px-2 py-1" title="Switch between GTO and exploit mode">
+                  <button
+                    className={`text-xs px-2 py-1 rounded ${strategyMode === "gto" ? "bg-gray-800 text-white" : "text-gray-400"}`}
+                    onClick={() => setStrategyMode("gto")}
+                  >
+                    GTO
+                  </button>
+                  <button
+                    className={`text-xs px-2 py-1 rounded ${strategyMode === "exploit" ? "bg-gray-800 text-white" : "text-gray-400"}`}
+                    onClick={() => setStrategyMode("exploit")}
+                  >
+                    Exploit
+                  </button>
+                </div>
+                <label className="flex items-center gap-2 text-xs text-gray-400" title="Show EV values with decimals">
+                  <input
+                    type="checkbox"
+                    checked={showEVDecimals}
+                    onChange={() => setShowEVDecimals(!showEVDecimals)}
+                    className="h-3.5 w-3.5 rounded border-gray-600 bg-gray-900 text-amber-400"
+                  />
+                  Show Decimals
+                </label>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3">
               <PlayerCountSelector />
               <Button
                 onClick={dealNewHand}
@@ -71,40 +114,22 @@ export default function GamePage() {
         </div>
       </div>
 
-      {/* Main Layout - GTO Wizard 3-Panel Structure */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left Panel - Controls (Optional, can be hidden) */}
-        <div className="w-0 lg:w-64 border-r border-gray-800 bg-[#1a1a1a] hidden lg:block">
-          {/* Left panel content can go here if needed */}
+      <div className="flex-1 flex flex-col items-center justify-start gap-6 p-6">
+        <div className="w-full max-w-5xl">
+          <Card className="p-6 bg-gray-800/50 border-gray-700">
+            <PokerTable />
+          </Card>
         </div>
-
-        {/* Center Panel - Poker Table & Action Buttons */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="flex-1 flex items-center justify-center p-6 overflow-auto">
-            {/* Poker Table - Always visible, never dimmed */}
-            <div className="w-full max-w-4xl">
-              <Card className="p-6 bg-gray-800/50 border-gray-700">
-                <PokerTable />
-              </Card>
-            </div>
-          </div>
-
-          {/* Action Buttons - Fixed at bottom, morphs into analysis */}
-          <div className="border-t border-gray-800 bg-[#1a1a1a] p-4">
-            <ActionButtonsWithFrequencies />
-          </div>
-        </div>
-
-        {/* Right Panel - GTO Sidebar (Strategy/Ranges) */}
-        <div className="w-0 lg:w-96 border-l border-gray-800 bg-[#1a1a1a] hidden lg:flex">
-          <GTOSidebar />
+        <div className="w-full max-w-5xl">
+          <ContinueButton />
         </div>
       </div>
 
-      {/* Modals */}
-      <BetSizingModal />
+      <div className="action-dock">
+        <ActionButtonsWithFrequencies />
+        <ActionHistoryBar />
+      </div>
 
-      {/* Hand History Review Modal */}
       {showHandReview && currentHandId && (
         <div 
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"

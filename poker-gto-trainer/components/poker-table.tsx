@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useGameStore } from "@/store/game-store";
 import { PokerCard } from "./poker-card";
-import { Badge } from "./ui/badge";
 import { ActionIndicator } from "./action-indicator";
 import { FoldAnimation } from "./fold-animation";
 import { getPositionFromSeat } from "@/lib/gto";
@@ -78,62 +77,48 @@ export function PokerTable() {
   }, [pot, previousPot]);
 
   return (
-    <div className="relative w-full max-w-4xl mx-auto aspect-[16/10]">
-      {/* Table surface - GTO Wizard style: Dark charcoal/near-black */}
-      <div className="absolute inset-0 rounded-full bg-[#121212] border-4 border-[#1a1a1a]">
-        {/* Inner table border - subtle */}
-        <div className="absolute inset-2 rounded-full border border-[#1f1f1f]"></div>
+    <div className="relative w-full max-w-5xl mx-auto aspect-[16/9]">
+      {/* Abstract curved table */}
+      <div className="absolute inset-0">
+        <div className="absolute left-1/2 top-[52%] h-[38%] w-[90%] -translate-x-1/2 rounded-[999px] border border-[#2e3a59] bg-gradient-to-b from-[#2e3a59]/40 to-transparent shadow-[0_-8px_24px_rgba(0,0,0,0.6)]" />
+        <div className="absolute left-1/2 top-[54%] h-[32%] w-[84%] -translate-x-1/2 rounded-[999px] border border-[#3a3a3a]/60" />
+      </div>
         
-        {/* Center area for pot and community cards - GTO Wizard style */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-3">
-          {/* Pot display - Simple centered format like GTO Wizard */}
-          <div className={`text-white text-2xl font-semibold transition-all duration-200 ${
-            potAnimation ? "scale-110" : "scale-100"
-          }`}>
-            {formatBB(pot)} bb
-          </div>
-          
-          {/* Current Bet to Call - Subtle below pot */}
-          {currentBet > 0 && (
-            <div className="text-gray-400 text-sm">
-              {formatBB(currentBet)} bb to call
-            </div>
-          )}
-
-          {/* Community Cards - Only show community cards in center */}
-          {communityCards.length > 0 && (
-            <div className="flex gap-2">
-              {communityCards.map((card, index) => (
-                <PokerCard 
-                  key={index} 
-                  card={card} 
-                  size="md"
-                  className="animate-in fade-in zoom-in duration-150"
-                  style={{
-                    animationDelay: `${index * 150}ms`
-                  }}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* Position and Stage badge */}
-          <div className="flex gap-2 flex-wrap justify-center">
-            <Badge variant="secondary" className="bg-gray-800 text-white">
-              Position: {playerPosition}
-            </Badge>
-            <Badge variant="secondary" className="bg-blue-800 text-white capitalize">
-              {gameStage}
-            </Badge>
-          </div>
+      {/* Pot + community cards */}
+      <div className="absolute left-1/2 top-[22%] -translate-x-1/2 flex flex-col items-center gap-3">
+        <div className={`text-white text-2xl font-semibold transition-all duration-200 ${
+          potAnimation ? "scale-110" : "scale-100"
+        }`}>
+          {formatBB(pot)} bb
         </div>
+        {currentBet > 0 && (
+          <div className="text-gray-400 text-sm">
+            {formatBB(currentBet)} bb to call
+          </div>
+        )}
+        {communityCards.length > 0 && (
+          <div className="flex gap-3">
+            {communityCards.map((card, index) => (
+              <PokerCard
+                key={index}
+                card={card}
+                size="lg"
+                className="shadow-[0_6px_18px_rgba(0,0,0,0.6)]"
+                style={{
+                  animationDelay: `${index * 120}ms`
+                }}
+              />
+            ))}
+          </div>
+        )}
+      </div>
 
-        {/* Player positions around the table */}
-        {playerPositions.map((seat, index) => {
-          const angle = (index / numPlayers) * 2 * Math.PI - Math.PI / 2;
-          const radius = 0.35;
+      {/* Player positions along the curve */}
+      {playerPositions.map((seat, index) => {
+          const angle = (index / numPlayers) * Math.PI + Math.PI;
+          const radius = 0.45;
           const x = Math.cos(angle) * radius;
-          const y = Math.sin(angle) * radius;
+          const y = Math.sin(angle) * radius * 0.45;
 
           const isPlayerSeat = seat === playerSeat;
           const betBB = Math.max(0, safePlayerBetsBB[seat] || 0); // Ensure betBB is never negative
@@ -154,7 +139,7 @@ export function PokerTable() {
               className="absolute"
               style={{
                 left: `${50 + x * 100}%`,
-                top: `${50 + y * 100}%`,
+                top: `${55 + y * 100}%`,
                 transform: "translate(-50%, -50%)",
               }}
             >
@@ -253,56 +238,22 @@ export function PokerTable() {
                 )}
                 
                 {/* Player info - GTO Wizard style: Circular orbs with rings */}
-                {isPlayerSeat ? (
-                  <div className={`rounded-full w-16 h-16 flex flex-col items-center justify-center border-2 transition-all relative ${
-                    isFolded 
-                      ? "bg-gray-900/50 border-gray-700 opacity-40" 
-                      : isPlayerTurn || isCurrentActor
-                      ? "bg-[#1a1a1a] border-green-500 shadow-[0_0_20px_rgba(34,197,94,0.6)] ring-2 ring-green-500/50"
-                      : "bg-[#1a1a1a] border-green-500"
-                  }`}>
-                    <div className="text-white text-[10px] font-semibold">YOU</div>
-                    <div className="text-green-400 text-xs font-bold">
-                      {formatBB(Math.max(0, playerStackBB - (safePlayerBetsBB[playerSeat] || 0)))} BB
-                    </div>
-                    {isFolded && (
-                      <div className="absolute -bottom-4 text-red-400 text-[9px] font-bold">FOLD</div>
-                    )}
-                  </div>
-                ) : (
-                  <div className={`rounded-full w-14 h-14 flex flex-col items-center justify-center border-2 transition-all relative ${
-                    isFolded 
-                      ? "bg-gray-900/50 border-gray-700 opacity-40" 
+                <div className={`flex flex-col items-center justify-center rounded-xl border px-3 py-2 text-[10px] font-semibold ${
+                  isFolded
+                    ? "bg-gray-900/40 border-gray-700 text-gray-500"
+                    : isPlayerSeat
+                      ? "bg-[#1a1a1a] border-emerald-500 text-emerald-200 shadow-[0_0_12px_rgba(16,185,129,0.4)]"
                       : isCurrentActor
-                      ? "bg-[#1a1a1a] border-orange-500 shadow-[0_0_20px_rgba(249,115,22,0.6)] ring-2 ring-orange-500/50"
-                      : justActed
-                      ? "bg-[#1a1a1a] border-blue-500"
-                      : "bg-[#1a1a1a] border-gray-600"
-                  }`}>
-                    {/* Action indicator for opponents */}
-                    {isCurrentActor && !isFolded && (
-                      <ActionIndicator 
-                        isActive={true} 
-                        seat={seat}
-                        action={actionHistory[actionHistory.length - 1]?.action as any}
-                        betSize={actionHistory[actionHistory.length - 1]?.betSize}
-                      />
-                    )}
-                    <div className={`text-[10px] font-semibold ${
-                      isFolded ? "text-gray-500" : "text-gray-300"
-                    }`}>
-                      {getPositionFromSeat(seat, numPlayers)}
-                    </div>
-                    <div className={`text-xs font-bold ${
-                      isFolded ? "text-gray-600" : "text-gray-400"
-                    }`}>
-                      {displayStack} BB
-                    </div>
-                    {isFolded && (
-                      <div className="absolute -bottom-4 text-red-400 text-[9px] font-bold">FOLD</div>
-                    )}
+                        ? "bg-[#1a1a1a] border-blue-500 text-blue-200 shadow-[0_0_12px_rgba(59,130,246,0.4)]"
+                        : "bg-[#1a1a1a] border-gray-700 text-gray-300"
+                }`}>
+                  <div className="text-[9px] uppercase tracking-wide">
+                    {isPlayerSeat ? "You" : getPositionFromSeat(seat, numPlayers)}
                   </div>
-                )}
+                  <div className="font-numeric text-xs text-gray-200">
+                    {displayStack} BB
+                  </div>
+                </div>
                 
                 {/* Blind indicators */}
                 {isSmallBlind && gameStage === "preflop" && (
@@ -346,7 +297,7 @@ export function PokerTable() {
                         })}
                       </div>
                       {/* Bet amount label below chips */}
-                      <div className="text-yellow-300 text-[10px] font-bold bg-yellow-900/80 px-2 py-0.5 rounded border border-yellow-600 whitespace-nowrap">
+                      <div className="font-numeric text-yellow-200 text-[10px] font-bold bg-yellow-900/80 px-2 py-0.5 rounded border border-yellow-600 whitespace-nowrap">
                         {displayAmount} BB
                       </div>
                     </div>
@@ -357,8 +308,7 @@ export function PokerTable() {
           );
         })}
         
-        {/* Visual bet indicators - chips shown at player positions, no text labels */}
-      </div>
+      {/* Visual bet indicators - chips shown at player positions, no text labels */}
       
       {/* Hand strength indicator and toggle - bottom right */}
       {playerHand && (

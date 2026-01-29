@@ -16,9 +16,10 @@ import { roundBB } from "@/lib/utils";
 import { SolverTree } from "@/lib/solver-tree";
 import { createDefaultSolverTree } from "@/lib/default-solver-tree";
 import { convertToActionEngineState, applyActionEngineStateToStore } from "@/lib/game-state-adapter";
-import { bettingRoundClosed, runVillainActions, resetBettingForNewStreet } from "@/lib/action-engine";
+import { bettingRoundClosed, runVillainActions, resetBettingForNewStreet, applyAction } from "@/lib/action-engine";
 import { runFlawlessVillainActions } from "@/lib/villain-engine";
 import { validateAction, validateAndAdjustBetSize, getAvailableActions } from "@/lib/action-validation";
+import { OpponentArchetype, StrategyMode } from "@/lib/leak-weighting";
 
 type GameState = {
   // Hand state
@@ -38,6 +39,8 @@ type GameState = {
   playerStackBB: number;
   playerStacksBB: number[]; // All player stacks in BBs
   playerBetsBB: number[]; // Current bets for each player in BBs
+  playerCommittedTotal: number[]; // Total committed this hand in BBs
+  playerHasActedThisStreet: boolean[]; // Track if player acted this street
   smallBlindSeat: number | null; // Seat number of small blind
   bigBlindSeat: number | null; // Seat number of big blind
   buttonSeat: number | null; // Seat number of button
@@ -79,6 +82,10 @@ type GameState = {
   showEVPanel: boolean; // Whether to show EV panel
   showPlayerHand: boolean; // Whether to show player's hand cards
   canSelectRange: boolean; // Whether range selection is allowed (independent of hand state)
+  opponentArchetype: OpponentArchetype;
+  strategyMode: StrategyMode;
+  showEVDecimals: boolean;
+  lastRaiseIncrement: number;
   
   // Actions
   setNumPlayers: (count: number) => void;
@@ -101,9 +108,12 @@ type GameState = {
   setShowPlayerHand: (show: boolean) => void;
   setCanSelectRange: (canSelect: boolean) => void;
   userClickedContinue: () => void;
+  setOpponentArchetype: (archetype: OpponentArchetype) => void;
+  setStrategyMode: (mode: StrategyMode) => void;
+  setShowEVDecimals: (show: boolean) => void;
 };
 
-const INITIAL_BIG_BLIND = 2;
+const INITIAL_BIG_BLIND = 1;
 const INITIAL_POT = 0;
 const INITIAL_BET = 0;
 
@@ -132,6 +142,8 @@ export const useGameStore = create<GameState>((set) => ({
   playerStackBB: 100,
   playerStacksBB: [],
   playerBetsBB: [],
+  playerCommittedTotal: [],
+  playerHasActedThisStreet: [],
   smallBlindSeat: null,
   bigBlindSeat: null,
   buttonSeat: null,
@@ -170,6 +182,10 @@ export const useGameStore = create<GameState>((set) => ({
   showEVPanel: false,
   showPlayerHand: true, // Show hand by default
   canSelectRange: true, // Allow range selection by default
+  opponentArchetype: "SOLVER_LIKE",
+  strategyMode: "gto",
+  showEVDecimals: false,
+  lastRaiseIncrement: INITIAL_BIG_BLIND,
 
   // Set number of players (minimum 2 to ensure at least one opponent)
   setNumPlayers: (count: number) => {
@@ -243,7 +259,7 @@ export const useGameStore = create<GameState>((set) => ({
     playerStacksBB[bigBlindSeat] = Math.max(0, roundBB(playerStacksBB[bigBlindSeat] - 1));
     
     // Calculate initial pot (blinds)
-    const initialPot = 1.5; // SB + BB
+    const initialPot = 1.5; // SB + BB in BB units
     
     // Generate unique hand ID for tracking (include session ID for analytics)
     const sessionManager = getSessionManager();
@@ -441,6 +457,14 @@ export const useGameStore = create<GameState>((set) => ({
       finalActionToFace = finalCurrentBet > INITIAL_BIG_BLIND ? "call" : "call";
     }
 
+    const committedSum = roundBB(finalBets.reduce((sum, bet) => sum + bet, 0));
+    if (Math.abs(finalPot - committedSum) > 0.01) {
+      console.error("Pot mismatch on dealNewHand:", { finalPot, committedSum });
+    }
+
+    const playerCommittedTotal = [...finalBets];
+    const playerHasActedThisStreet = Array(numPlayers).fill(false);
+
     set({
       playerHand,
       opponentHands, // Store opponent hands (null for player seat)
@@ -455,6 +479,8 @@ export const useGameStore = create<GameState>((set) => ({
       playerStackBB: playerStacksBB[playerSeat],
       playerStacksBB,
       playerBetsBB: finalBets, // Include opponent bets
+      playerCommittedTotal,
+      playerHasActedThisStreet,
       smallBlindSeat,
       bigBlindSeat,
       buttonSeat,
@@ -473,6 +499,7 @@ export const useGameStore = create<GameState>((set) => ({
       currentHandId: handId, // Track current hand
       handEV: 0, // Reset hand EV for new hand
       evLoss: 0, // Reset EV loss for new hand
+      lastRaiseIncrement: INITIAL_BIG_BLIND,
       feedback: null,
       isCorrect: null,
       optimalActions: [],
@@ -539,7 +566,9 @@ export const useGameStore = create<GameState>((set) => ({
         state.currentBet,
         playerCurrentBet,
         state.playerStackBB,
-        state.bigBlind
+        state.bigBlind,
+        undefined,
+        state.lastRaiseIncrement
       );
       
       if (!validation.isValid) {
@@ -574,7 +603,8 @@ export const useGameStore = create<GameState>((set) => ({
       state.currentBet,
       playerCurrentBet,
       state.playerStackBB,
-      state.bigBlind
+      state.bigBlind,
+      state.lastRaiseIncrement
     );
     
     if (!validation.isValid) {
@@ -657,7 +687,8 @@ export const useGameStore = create<GameState>((set) => ({
       playerCurrentBet,
       state.playerStackBB,
       state.bigBlind,
-      betSizeBB
+      betSizeBB,
+      state.lastRaiseIncrement
     );
     
     if (!validation.isValid) {
@@ -669,62 +700,22 @@ export const useGameStore = create<GameState>((set) => ({
     // Use adjusted bet size if validation adjusted it
     const finalBetSize = validation.adjustedBetSize || betSizeBB;
 
+    const preActionPot = state.pot;
+    const preActionCurrentBet = state.currentBet;
+    const engineState = convertToActionEngineState();
+    try {
+      applyAction(engineState, state.playerSeat, action as any, finalBetSize);
+    } catch (error) {
+      console.error("Invalid action in engine:", error);
+      return;
+    }
+    applyActionEngineStateToStore(engineState);
+
     // Handle preflop vs post-flop
     if (state.gameStage === "preflop") {
       // Preflop logic
       const result = getGTOAction(state.playerHand, state.playerPosition, action as Action, state.numPlayers);
       const explanation = getGTOExplanation(state.playerHand, state.playerPosition, action as Action, result.optimalActions, state.numPlayers);
-
-      // Update player bets based on action
-      const updatedBets = [...state.playerBetsBB];
-      const previousBet = updatedBets[state.playerSeat] || 0;
-      let newPot = state.pot;
-      const updatedStacks = [...state.playerStacksBB];
-      
-      if (action === "call") {
-        // Call the current bet (BB)
-        const callAmount = state.currentBet;
-        const additionalAmount = callAmount - previousBet;
-        updatedBets[state.playerSeat] = callAmount;
-        
-        // CRITICAL: Update pot and stack accurately
-        newPot = roundBB(newPot + additionalAmount);
-        updatedStacks[state.playerSeat] = Math.max(0, roundBB(updatedStacks[state.playerSeat] - additionalAmount));
-      } else if (action === "raise" && finalBetSize) {
-        // Raise to finalBetSize (validated)
-        const additionalAmount = finalBetSize - previousBet;
-        updatedBets[state.playerSeat] = finalBetSize;
-        
-        // CRITICAL: Update pot and stack accurately
-        newPot = roundBB(newPot + additionalAmount);
-        updatedStacks[state.playerSeat] = Math.max(0, roundBB(updatedStacks[state.playerSeat] - additionalAmount));
-        
-        // Update current bet to the raise size
-        set({ currentBet: finalBetSize });
-      } else if (action === "fold") {
-        // Player folds, bet stays at previous bet (chips already in pot)
-        // Mark player as folded
-        const updatedFolded = [...state.foldedPlayers];
-        updatedFolded[state.playerSeat] = true;
-        set({ foldedPlayers: updatedFolded });
-      }
-      
-      // CRITICAL: Update stacks and pot
-      set({
-        pot: newPot,
-        playerStacksBB: updatedStacks,
-        playerStackBB: updatedStacks[state.playerSeat]
-      });
-
-      // Add to action history
-      const newActionHistory = [
-        ...state.actionHistory,
-        {
-          player: "You",
-          action: action as string,
-          betSize: finalBetSize || (action === "call" ? state.currentBet : undefined),
-        },
-      ];
 
       // Calculate EV loss for this action
       let evLoss = 0;
@@ -733,8 +724,8 @@ export const useGameStore = create<GameState>((set) => ({
           state.playerHand,
           [],
           "preflop",
-          state.pot,
-          state.currentBet,
+          preActionPot,
+          preActionCurrentBet,
           action as string,
           result.optimalActions,
           finalBetSize,
@@ -757,9 +748,7 @@ export const useGameStore = create<GameState>((set) => ({
         showFeedbackModal: false, // Don't show modal - feedback is integrated into buttons
         isPlayerTurn: false,
         canSelectRange: true, // Unlock range selection when player's turn ends
-        playerBetsBB: updatedBets,
         lastActorSeat: state.playerSeat, // Track who just acted
-        actionHistory: newActionHistory,
         handEV: newHandEV, // Track EV for this hand
         evLoss: evLoss, // Store EV loss for this action
         // Only keep bet sizing analysis if action was actually a raise
@@ -825,53 +814,6 @@ export const useGameStore = create<GameState>((set) => ({
         handStrength
       );
       
-      // Update player bets based on action
-      const updatedBets = [...state.playerBetsBB];
-      const previousBet = updatedBets[state.playerSeat] || 0;
-      let newPot = state.pot;
-      const updatedStacks = [...state.playerStacksBB];
-      
-      if (postFlopAction === "call" && state.actionToFace === "bet") {
-        // Call the current bet
-        const callAmount = state.currentBet;
-        const additionalAmount = callAmount - previousBet;
-        updatedBets[state.playerSeat] = callAmount;
-        
-        // CRITICAL: Update pot accurately
-        newPot = roundBB(newPot + additionalAmount);
-        
-        // CRITICAL: Update player stack
-        updatedStacks[state.playerSeat] = Math.max(0, roundBB(updatedStacks[state.playerSeat] - additionalAmount));
-      } else if (postFlopAction === "bet" || (postFlopAction === "raise" && finalBetSize)) {
-        // Bet or raise - use validated bet size
-        const betAmount = finalBetSize || state.currentBet;
-        const additionalAmount = betAmount - previousBet;
-        updatedBets[state.playerSeat] = betAmount;
-        
-        // CRITICAL: Update pot accurately
-        newPot = roundBB(newPot + additionalAmount);
-        
-        // CRITICAL: Update player stack
-        updatedStacks[state.playerSeat] = Math.max(0, roundBB(updatedStacks[state.playerSeat] - additionalAmount));
-        
-        set({ currentBet: betAmount });
-      } else if (postFlopAction === "check") {
-        // Check - no bet change, no pot/stack changes
-        updatedBets[state.playerSeat] = 0;
-      } else if (postFlopAction === "fold") {
-        // Fold - bet stays at previous bet (chips already in pot), mark player as folded
-        const updatedFolded = [...state.foldedPlayers];
-        updatedFolded[state.playerSeat] = true;
-        set({ foldedPlayers: updatedFolded });
-      }
-      
-      // CRITICAL: Update stacks and pot
-      set({
-        pot: newPot,
-        playerStacksBB: updatedStacks,
-        playerStackBB: updatedStacks[state.playerSeat]
-      });
-      
       // Calculate EV loss for this action
       let evLoss = 0;
       try {
@@ -879,8 +821,8 @@ export const useGameStore = create<GameState>((set) => ({
           state.playerHand,
           state.communityCards,
           state.gameStage,
-          state.pot,
-          state.currentBet,
+          preActionPot,
+          preActionCurrentBet,
           postFlopAction as string,
           result.optimalActions,
           finalBetSize,
@@ -894,15 +836,6 @@ export const useGameStore = create<GameState>((set) => ({
       const newHandEV = state.handEV + evLoss;
 
       // Add to action history
-      const newActionHistory = [
-        ...state.actionHistory,
-        {
-          player: "You",
-          action: postFlopAction as string,
-          betSize: finalBetSize || (postFlopAction === "call" ? state.currentBet : undefined),
-        },
-      ];
-
       set({
         lastAction: postFlopAction as Action,
         feedback: result.feedback,
@@ -912,10 +845,7 @@ export const useGameStore = create<GameState>((set) => ({
         postFlopExplanation,
         isPlayerTurn: false,
         showFeedbackModal: false, // Don't show modal - feedback is integrated into buttons
-        playerBetsBB: updatedBets,
-        pot: newPot, // Update pot with new bet amounts
         lastActorSeat: state.playerSeat, // Track who just acted
-        actionHistory: newActionHistory,
         handEV: newHandEV, // Track EV for this hand
         evLoss: evLoss, // Store EV loss for this action
         // Only keep bet sizing analysis if action was actually a bet or raise
@@ -996,33 +926,11 @@ export const useGameStore = create<GameState>((set) => ({
           });
           // CRITICAL: Do NOT auto-advance - user controls via Continue button
           // The ContinueButton component will handle progression
-        } else {
-          // Update action to face based on current bet and reset feedback
-          const currentState = useGameStore.getState();
-          if (currentState.currentBet > 0 && currentState.isPlayerTurn) {
-            set({ 
-              actionToFace: "bet",
-              // Reset feedback state for new action
-              isCorrect: null,
-              lastAction: null,
-              feedback: null,
-              evLoss: 0,
-            });
-          } else if (currentState.currentBet === 0 && currentState.isPlayerTurn) {
-            set({ 
-              actionToFace: "check",
-              // Reset feedback state for new action
-              isCorrect: null,
-              lastAction: null,
-              feedback: null,
-              evLoss: 0,
-            });
-          }
         }
       } catch (error) {
         console.error("Error in flawless villain engine:", error);
-        // Fallback to legacy behavior only as last resort
-        processOpponentActionsLegacy();
+        // Fail safe: do not mutate state on engine error
+        return;
       }
     } else {
       // Use legacy behavior
@@ -1204,6 +1112,7 @@ export const useGameStore = create<GameState>((set) => ({
     
     // Reset all bets for new street (but keep folded players tracked)
     const resetBets = Array(state.numPlayers).fill(0);
+    const resetHasActed = Array(state.numPlayers).fill(false);
     
     // If using solver engine, properly reset betting state
     if (state.useSolverEngine) {
@@ -1232,7 +1141,9 @@ export const useGameStore = create<GameState>((set) => ({
       canSelectRange: true, // Allow range selection when not actively making a decision
       currentBet: 0,
       playerBetsBB: resetBets,
+      playerHasActedThisStreet: resetHasActed,
       lastActorSeat: null, // Reset last actor for new street
+      lastRaiseIncrement: state.bigBlind,
       // Reset feedback state for new action
       isCorrect: null,
       lastAction: null,
@@ -1367,6 +1278,8 @@ export const useGameStore = create<GameState>((set) => ({
       isPlayerTurn: true,
       activePlayers: 0,
       foldedPlayers: [],
+      playerCommittedTotal: [],
+      playerHasActedThisStreet: [],
       lastActorSeat: null,
       lastAction: null,
       feedback: null,
@@ -1381,6 +1294,10 @@ export const useGameStore = create<GameState>((set) => ({
       betSizeAnalysis: null,
       postFlopBetSizeAnalysis: null,
       opponentStats: DEFAULT_OPPONENT_STATS,
+      opponentArchetype: "SOLVER_LIKE",
+      strategyMode: "gto",
+      showEVDecimals: false,
+      lastRaiseIncrement: INITIAL_BIG_BLIND,
     });
   },
 
@@ -1416,6 +1333,18 @@ export const useGameStore = create<GameState>((set) => ({
   
   setCanSelectRange: (canSelect: boolean) => {
     set({ canSelectRange: canSelect });
+  },
+  
+  setOpponentArchetype: (archetype: OpponentArchetype) => {
+    set({ opponentArchetype: archetype });
+  },
+  
+  setStrategyMode: (mode: StrategyMode) => {
+    set({ strategyMode: mode });
+  },
+  
+  setShowEVDecimals: (show: boolean) => {
+    set({ showEVDecimals: show });
   },
   
   setPausedForReview: (paused: boolean) => {

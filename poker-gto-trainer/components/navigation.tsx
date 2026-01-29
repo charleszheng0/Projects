@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Button } from "./ui/button";
 
 export function Navigation() {
   const pathname = usePathname();
@@ -15,22 +14,20 @@ export function Navigation() {
   ];
 
   return (
-    <nav className="flex gap-1">
+    <nav className="flex items-center gap-6">
       {navItems.map((item) => {
         const isActive = pathname === item.href;
         return (
           <Link key={item.href} href={item.href}>
-            <Button
-              variant={isActive ? "default" : "ghost"}
-              size="sm"
-              className={
+            <span
+              className={`text-sm font-semibold pb-1 border-b-2 transition-colors ${
                 isActive
-                  ? "bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/50 font-semibold"
-                  : "text-gray-300 hover:text-white hover:bg-gray-800"
-              }
+                  ? "text-white border-amber-400"
+                  : "text-gray-400 border-transparent hover:text-white hover:border-gray-600"
+              }`}
             >
               {item.label}
-            </Button>
+            </span>
           </Link>
         );
       })}

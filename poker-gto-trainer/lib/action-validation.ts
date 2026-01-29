@@ -23,10 +23,12 @@ export function validateAction(
   playerCurrentBet: number,
   playerStack: number,
   bigBlind: number,
-  betSizeBB?: number
+  betSizeBB?: number,
+  lastRaiseIncrement?: number
 ): ActionValidationResult {
   const toCall = currentBet - playerCurrentBet;
   const isPreflop = gameStage === "preflop";
+  const minRaiseIncrement = lastRaiseIncrement || bigBlind;
 
   switch (action) {
     case "fold":
@@ -40,9 +42,6 @@ export function validateAction(
       // Can only check if no bet to face
       if (toCall > 0) {
         return { isValid: false, error: "Cannot check when facing a bet" };
-      }
-      if (isPreflop) {
-        return { isValid: false, error: "Cannot check preflop" };
       }
       return { isValid: true };
 
@@ -93,19 +92,10 @@ export function validateAction(
       const totalBet = isPreflop ? betSizeBB : currentBet + (betSizeBB - currentBet);
       
       // Validate minimum raise
-      if (isPreflop) {
-        // Preflop: minimum raise is 2x big blind
-        const minRaise = bigBlind * 2;
-        if (betSizeBB < minRaise) {
-          return { isValid: false, error: `Preflop raise must be at least ${minRaise} BB` };
-        }
-      } else {
-        // Postflop: minimum raise is 2x current bet
-        const minRaise = currentBet * 2;
-        if (totalBet < minRaise) {
-          const adjustedRaise = minRaise;
-          return { isValid: false, error: `Raise must be at least ${adjustedRaise} BB (minimum raise)`, adjustedBetSize: adjustedRaise };
-        }
+      const minRaise = isPreflop ? bigBlind * 2 : currentBet + minRaiseIncrement;
+      if (totalBet < minRaise) {
+        const adjustedRaise = minRaise;
+        return { isValid: false, error: `Raise must be at least ${adjustedRaise} BB (minimum raise)`, adjustedBetSize: adjustedRaise };
       }
       
       // Validate player has enough chips
@@ -142,8 +132,8 @@ export function getAvailableActions(
     if (toCall > 0) {
       available.push("fold", "call", "raise");
     } else {
-      // Can check (limping) or raise
-      available.push("call", "raise");
+      // Can check (BB option) or raise
+      available.push("check", "raise");
     }
   } else {
     // Postflop actions
@@ -171,11 +161,13 @@ export function calculateValidBetSizes(
   currentBet: number,
   playerCurrentBet: number,
   playerStack: number,
-  bigBlind: number
+  bigBlind: number,
+  lastRaiseIncrement?: number
 ): number[] {
   const isPreflop = gameStage === "preflop";
   const toCall = currentBet - playerCurrentBet;
   const validSizes: number[] = [];
+  const minRaiseIncrement = lastRaiseIncrement || bigBlind;
 
   if (action === "bet") {
     // Bet sizes (postflop only)
@@ -225,7 +217,7 @@ export function calculateValidBetSizes(
       return validSizes.sort((a, b) => a - b);
     } else {
       // Postflop: raises above current bet
-      const minRaise = currentBet * 2;
+      const minRaise = currentBet + minRaiseIncrement;
       const maxRaise = playerCurrentBet + playerStack;
       
       // Calculate raise increments
@@ -266,9 +258,11 @@ export function validateAndAdjustBetSize(
   currentBet: number,
   playerCurrentBet: number,
   playerStack: number,
-  bigBlind: number
+  bigBlind: number,
+  lastRaiseIncrement?: number
 ): { isValid: boolean; adjustedSize: number; error?: string } {
   const isPreflop = gameStage === "preflop";
+  const minRaiseIncrement = lastRaiseIncrement || bigBlind;
   
   if (action === "bet") {
     const minBet = Math.max(1, bigBlind);
@@ -292,7 +286,7 @@ export function validateAndAdjustBetSize(
       return { isValid: true, adjustedSize: betSizeBB };
     } else {
       const totalBet = betSizeBB;
-      const minRaise = currentBet * 2;
+      const minRaise = currentBet + minRaiseIncrement;
       if (totalBet < minRaise) {
         return { isValid: false, adjustedSize: minRaise, error: `Raise must be at least ${minRaise} BB (minimum raise)` };
       }

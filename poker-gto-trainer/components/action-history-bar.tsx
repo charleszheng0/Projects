@@ -70,8 +70,8 @@ export function ActionHistoryBar() {
   }
 
   return (
-    <div className="w-full bg-[#0f0f0f] border-b border-gray-800 px-4 py-2 overflow-x-auto">
-      <div className="flex items-center gap-2 min-w-max">
+    <div className="action-history">
+      <div className="action-history-row min-w-max">
         {breadcrumbs.map((crumb, index) => {
           if (crumb.type === "street") {
             const cards = getStreetCards(crumb.label);

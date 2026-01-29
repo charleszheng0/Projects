@@ -1,9 +1,11 @@
 "use client";
 
 import { useGameStore } from "@/store/game-store";
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
+import { getAdjustedGTOAction } from "@/lib/gto-table-size";
+import { Hand, Position } from "@/lib/gto";
 
 const RANKS = ["A", "K", "Q", "J", "T", "9", "8", "7", "6", "5", "4", "3", "2"];
 
@@ -43,16 +45,27 @@ function getHandEncoding(row: number, col: number): string | null {
  * 13x13 matrix for selecting hands
  * Independent of action buttons - read-only during hand
  */
-export function RangeSelector() {
+type RangeSelectorProps = {
+  defaultOpen?: boolean;
+  showToggle?: boolean;
+};
+
+export function RangeSelector({ defaultOpen = true, showToggle = false }: RangeSelectorProps) {
   const {
     customRange,
     useCustomRange,
     toggleHandInRange,
     setUseCustomRange,
     canSelectRange,
+    playerPosition,
+    playerStackBB,
+    numPlayers,
   } = useGameStore();
   
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragMode, setDragMode] = useState<"add" | "remove">("add");
+  const dragTargetRef = useRef<string | null>(null);
   
   // CRITICAL: Use independent state for range selection (not tied to playerHand)
   const isReadOnly = !canSelectRange;
@@ -73,27 +86,64 @@ export function RangeSelector() {
       </Button>
     );
   }
+
+  const tableSize = playerStackBB <= 25 ? 2 : playerStackBB <= 50 ? 4 : numPlayers;
+  const legalRange = useMemo(() => {
+    const legalSet = new Set<string>();
+    RANKS.forEach((rank1, i) => {
+      RANKS.forEach((rank2, j) => {
+        const encoding = getHandEncoding(i, j);
+        if (!encoding) return;
+        const isPair = i === j;
+        const isSuited = i > j;
+        const hand: Hand = {
+          card1: { rank: RANKS[Math.min(i, j)], suit: "hearts" },
+          card2: { rank: RANKS[Math.max(i, j)], suit: isSuited ? "hearts" : "diamonds" },
+        };
+        const gto = getAdjustedGTOAction(hand, playerPosition as Position, tableSize, "call");
+        const isInRange = gto.optimalActions.some(action => action !== "fold");
+        if (isInRange) legalSet.add(encoding);
+      });
+    });
+    return legalSet;
+  }, [playerPosition, tableSize]);
+
+  useEffect(() => {
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      dragTargetRef.current = null;
+    };
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => window.removeEventListener("mouseup", handleMouseUp);
+  }, []);
   
   return (
     <Card className="p-4 bg-gray-900 border-gray-700">
       <div className="flex justify-between items-center mb-4">
-        <h3 className="text-white font-semibold">Custom Range</h3>
+        <div>
+          <h3 className="text-white font-semibold">Range Selector</h3>
+          <p className="text-xs text-gray-400">
+            Position: {playerPosition} · Stack: {Math.round(playerStackBB)} BB
+          </p>
+        </div>
         <div className="flex gap-2">
           <Button
             onClick={() => setUseCustomRange(!useCustomRange)}
             variant={useCustomRange ? "default" : "outline"}
             size="sm"
-            className={useCustomRange ? "bg-blue-600" : ""}
+            className={useCustomRange ? "bg-[#00ADEF]" : ""}
           >
             {useCustomRange ? "Enabled" : "Disabled"}
           </Button>
-          <Button
-            onClick={() => setIsOpen(false)}
-            variant="outline"
-            size="sm"
-          >
-            Close
-          </Button>
+          {showToggle && (
+            <Button
+              onClick={() => setIsOpen(false)}
+              variant="outline"
+              size="sm"
+            >
+              Close
+            </Button>
+          )}
         </div>
       </div>
       
@@ -104,7 +154,7 @@ export function RangeSelector() {
       )}
       
       {/* 13x13 Matrix */}
-      <div className="grid gap-1" style={{ gridTemplateColumns: "repeat(14, minmax(0, 1fr))" }}>
+      <div className="grid gap-1 select-none" style={{ gridTemplateColumns: "repeat(14, minmax(0, 1fr))" }}>
         {/* Header row */}
         <div></div>
         {RANKS.map(rank => (
@@ -129,31 +179,49 @@ export function RangeSelector() {
               const isSelected = customRange.has(encoding);
               const isPair = row === col;
               const isSuited = row > col;
-              
+              const isLegal = legalRange.has(encoding);
+              const isDisabled = isReadOnly || !isLegal;
+
+              const baseColor = isSelected
+                ? "bg-[#FFD700] text-black"
+                : isLegal
+                  ? "bg-[#C72C48] text-white"
+                  : "bg-gray-800 text-gray-500";
+
               return (
                 <button
                   key={col}
-                  onClick={() => {
-                    if (!isReadOnly) {
+                  onMouseDown={() => {
+                    if (isDisabled) return;
+                    setIsDragging(true);
+                    const nextMode = isSelected ? "remove" : "add";
+                    setDragMode(nextMode);
+                    dragTargetRef.current = encoding;
+                    toggleHandInRange(encoding);
+                  }}
+                  onMouseEnter={() => {
+                    if (!isDragging || isDisabled) return;
+                    if (dragTargetRef.current === encoding) return;
+                    dragTargetRef.current = encoding;
+                    if (dragMode === "add" && !isSelected) {
+                      toggleHandInRange(encoding);
+                    } else if (dragMode === "remove" && isSelected) {
                       toggleHandInRange(encoding);
                     }
                   }}
-                  disabled={isReadOnly}
+                  onClick={() => {
+                    if (!isDisabled && !isDragging) {
+                      toggleHandInRange(encoding);
+                    }
+                  }}
+                  disabled={isDisabled}
                   className={`
-                    w-8 h-8 text-xs font-semibold rounded
-                    ${isPair 
-                      ? "bg-gray-700" 
-                      : isSuited 
-                        ? "bg-blue-900/30" 
-                        : "bg-gray-800"
-                    }
-                    ${isSelected 
-                      ? "bg-green-600 text-white" 
-                      : "text-gray-300 hover:bg-gray-700"
-                    }
-                    ${isReadOnly ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
+                    w-8 h-8 text-[10px] font-semibold rounded transition-colors
+                    ${baseColor}
+                    ${isLegal && !isSelected ? "hover:brightness-110" : ""}
+                    ${isDisabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
                   `}
-                  title={encoding}
+                  title={`${encoding}${isLegal ? "" : " (out of range)"}`}
                 >
                   {isPair ? "P" : isSuited ? "s" : "o"}
                 </button>
@@ -163,8 +231,8 @@ export function RangeSelector() {
         ))}
       </div>
       
-      <div className="mt-4 text-sm text-gray-400">
-        Selected: {customRange.size} hands
+      <div className="mt-4 text-xs text-gray-400">
+        Selected: {customRange.size} hands · In range: {legalRange.size} hands
       </div>
     </Card>
   );

@@ -22,7 +22,8 @@ export function BetSizingModal() {
     showFeedbackModal,
     currentBet,
     playerBetsBB,
-    playerSeat
+    playerSeat,
+    lastRaiseIncrement
   } = useGameStore();
   const isPreflop = gameStage === "preflop";
   
@@ -67,7 +68,8 @@ export function BetSizingModal() {
           currentBet,
           playerCurrentBet,
           remainingStack,
-          bigBlind
+          bigBlind,
+          lastRaiseIncrement
         );
         
         if (!validation.isValid && validation.error) {
@@ -109,7 +111,8 @@ export function BetSizingModal() {
       currentBet,
       playerCurrentBet,
       remainingStack,
-      bigBlind
+      bigBlind,
+      lastRaiseIncrement
     );
     
     // Limit to reasonable number of options
@@ -154,7 +157,8 @@ export function BetSizingModal() {
       currentBet,
       playerCurrentBet,
       remainingStack,
-      bigBlind
+      bigBlind,
+      lastRaiseIncrement
     );
     
     if (!validation.isValid) {

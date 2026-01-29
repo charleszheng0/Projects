@@ -1,651 +1,894 @@
-# Poker GTO Training Bot - Development Instructions
+IMPLEMENTATION PROMPT — Leak-Weighted GTO + Inline “Why This Bet”
+
+You are a senior poker-theory engineer and UI-focused frontend architect.
+
+Build a Human-Leak–Aware GTO Mode for a poker solver–based web app. The UI must be clean, professional, and fast to scan. Do not build a training toy. Do not hide the logic behind navigation.
+
+PRIMARY GOALS (NON-NEGOTIABLE)
+1) Opponent archetype selection.
+2) Leak-weighted EV recomputation.
+3) Show pure GTO vs max-exploit line and EV delta.
+4) Inline “Why This Bet Exists” tooltip for every action.
+5) One-screen interaction with zero navigation friction.
+6) No solver jargon in the UI.
+
+CORE UX PRINCIPLES
+- Single-screen interaction. No side panels, no page transitions, no modal stacks.
+- Information appears exactly where attention already is.
+- Readable in < 1 second. Reasoning in < 3 seconds.
+- Professional, minimal, typography-driven layout.
+
+TOP BAR (COMPACT)
+Show context in a single row:
+- Situation summary (stack depth, positions, board).
+- Opponent archetype selector (text only, compact).
+- Mode toggle (GTO vs Exploit) on right.
+
+ARCHETYPE OPTIONS (TEXT ONLY)
+- Solver-Like Reg (default)
+- Over-Folds (esp. river)
+- Station / Calls Too Much
+- Scared Money
+- Over-Aggressive / Over-Bluffs
+
+ACTION VIEW (PRIMARY TABLE)
+Render a clean vertical list (not cards, not floating buttons):
+Action | Frequency | EV | Info
+Bet 33% | Often | +1.12 | ℹ️
+Bet 66% | Sometimes | +1.28 | ℹ️
+Check | Rare | +0.94 | ℹ️
+
+Rules:
+- Entire row is clickable.
+- No decimals by default (toggleable).
+- In exploit mode, highlight EV delta subtly.
+- When EV delta is small: “GTO is sufficient here.”
+
+INLINE “WHY THIS BET” TOOLTIP (MANDATORY)
+Interaction:
+- Hover (desktop) or tap-hold (mobile) on ℹ️.
+- Tooltip appears adjacent to the row.
+- No overlay blocking other UI. No page jump.
+
+Content format (strict):
+Why Bet 66%
+Targets
+• One-pair hands
+• Weak top pair
+Folds Out
+• Missed draws
+• Low-equity bluff-catchers
+Continues
+• Strong top pair+
+• Nut draws
+
+Exploit note (only if exploit mode active):
+Exploit Note
+• Over-folders release bluff-catchers too often
+• Larger sizing increases fold EV
+
+Rules:
+- Bullet points only.
+- No solver jargon.
+- No frequencies.
+- No EV numbers.
+- One-line bullets max.
+
+LEAK-WEIGHTED LOGIC (MODEL/BACKEND)
+Inputs per node:
+- GTO strategy: frequencies, EV per action, range distributions.
+- Alternative lines: different sizings, bluffs, thin value.
+
+Archetype adjustments:
+- Modify fold frequency by sizing and street.
+- Modify call frequency by hand class cluster.
+- Modify bluff-catch thresholds.
+
+Computation:
+- Keep GTO baseline fixed.
+- EV_exploit(action) = Σ(adjusted outcomes × payoff)
+- EV_delta = EV_exploit − EV_GTO
 
-## What We're Building
+DATA MODEL REQUIREMENTS
+For each action, precompute:
+- Targeted hand clusters
+- Folding hand clusters
+- Continuing hand clusters
 
-A poker training website where users:
-1. Sign in (with Clerk - free)
-2. Get dealt random preflop hands
-3. Choose actions (fold, bet, raise, call)
-4. Get GTO feedback on their decisions
-5. Track progress over time
+Use range grouping, not individual combos.
+Tooltip content must update when:
+- Board changes
+- Opponent archetype changes
+- Mode toggles
 
-**Tech Stack:** Next.js + Clerk + Supabase + shadcn/ui
+VISUAL & UX CONSTRAINTS (STRICT)
+- One screen only.
+- No modals.
+- No solver trees.
+- No range matrices by default.
+- Neutral gray-based palette.
+- Max two accent colors.
+- No gradients, no poker-themed colors.
+- Tooltips appear in ≤ 100ms, disappear instantly on mouse leave.
+- Every action has hover state and disabled reason when applicable.
 
-**Everything is FREE** - All services have generous free tiers that are more than enough for this project.
+OUTPUT REQUIRED FROM YOU (AI)
+- Architecture overview.
+- React-style component breakdown.
+- Tooltip data schema.
+- Leak-weighting logic pseudocode.
+- Example tooltip content for two actions.
+- Explanation: how inline “Why This Bet” reduces cognitive load.
+- Before vs after UI structure comparison.
+- Screen layout diagram (text OK).
+- UI ruleset (what never appears by default).
 
----
+SUCCESS CRITERIA
+- User understands recommendation in < 1 second.
+- User understands reasoning in < 3 seconds.
+- User never feels lost or overwhelmed.
+IMPLEMENTATION PROMPT — FEATURE 1
+Leak-Weighted GTO + Tactical Explanation Layer
 
-## Quick Setup
+You are a senior poker-theory engineer and product-focused frontend architect.
 
-### Prerequisites
-- Node.js 18+ ([download free](https://nodejs.org/))
-- Git ([download free](https://git-scm.com/))
-- VS Code ([download free](https://code.visualstudio.com/))
+Your task is to implement Leak-Weighted GTO Mode with a beginner-friendly, modern UI, designed for real poker players (not solver experts).
 
-### Initial Setup
+The goal is to bridge pure GTO → real-world exploit, with simple visualizations and minimal cognitive load.
 
-**Option 1: Using npx (Recommended)**
+CORE USER FLOW (NON-NEGOTIABLE)
+Step 1: Opponent Selection (Top of Screen)
 
-```bash
-# 1. Create Next.js app
-npx create-next-app@latest poker-gto-trainer --typescript --tailwind --app --yes
-cd poker-gto-trainer
-```
+User selects one opponent archetype from a small, human-readable list:
 
-**If you get an error, try:**
+🟦 Solver-Like Reg (near GTO)
 
-```bash
-# Clear npm cache
-npm cache clean --force
+🟨 Over-Folds River
 
-# Try again
-npx create-next-app@latest poker-gto-trainer --typescript --tailwind --app --yes
-```
+🟥 Station / Calls Too Much
 
-**Option 2: Manual Setup (If npx fails)**
+🟩 Scared Money
 
-```bash
-# 1. Create folder
-mkdir poker-gto-trainer
-cd poker-gto-trainer
+🟪 Aggro / Over-Bluffs
 
-# 2. Initialize npm project
-npm init -y
+UX rules
 
-# 3. Install Next.js and dependencies
-npm install next@latest react@latest react-dom@latest typescript @types/react @types/node @types/react-dom tailwindcss postcss autoprefixer
+Icons + plain English
 
-# 4. Create tsconfig.json
-npx tsc --init
+No jargon
 
-# 5. Create next.config.js
-echo "module.exports = {}" > next.config.js
+One click selection
 
-# 6. Create app folder structure
-mkdir app
-mkdir app\api
-mkdir lib
-mkdir components
-```
+Default = Solver-Like Reg
 
-**Continue with setup:**
+Step 2: Action View (Primary Screen)
 
-```bash
-# 2. Install dependencies
-npm install @clerk/nextjs @supabase/supabase-js
+User sees ONE clear recommendation card, not a solver tree.
 
-# 3. Initialize shadcn/ui
-npx shadcn-ui@latest init
-# Choose: TypeScript, Tailwind, Default style, App directory
+Recommended Action
+Bet 66% Pot — Often
 
-# 4. Start dev server
-npm run dev
-```
+EV vs Solver Reg: +0.00
+EV vs Over-Folder: +0.38 bb
 
-Visit `http://localhost:3000` - you should see the Next.js welcome page.
 
-**Common Issues:**
+Below the card:
 
-- **"Something went wrong"**: Clear npm cache with `npm cache clean --force` and try again
-- **Network errors**: Check your internet connection, try again later
-- **Permission errors**: Run terminal as administrator (Windows) or use `sudo` (Mac/Linux)
-- **Node version**: Make sure you have Node.js 18+ (`node --version`)
+Toggle:
 
----
+◉ Pure GTO
 
-## Step 1: Set Up Clerk (Authentication) - FREE
+◉ Exploit-Max
 
-1. Go to [clerk.com](https://clerk.com) → Sign up (free account)
-2. Create new application → Choose "Email" authentication
-3. Copy your keys from the dashboard
-4. Create `.env.local` in your project root:
-
-```env
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
-CLERK_SECRET_KEY=sk_test_...
-```
-
-5. Update `app/layout.tsx`:
-
-```typescript
-import { ClerkProvider } from '@clerk/nextjs'
-
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <ClerkProvider>
-      <html lang="en">
-        <body>{children}</body>
-      </html>
-    </ClerkProvider>
-  )
-}
-```
-
-6. Create sign-in page: `app/sign-in/[[...sign-in]]/page.tsx`
-
-```typescript
-import { SignIn } from '@clerk/nextjs'
-
-export default function SignInPage() {
-  return (
-    <div className="flex items-center justify-center min-h-screen">
-      <SignIn />
-    </div>
-  )
-}
-```
-
-7. Create sign-up page: `app/sign-up/[[...sign-up]]/page.tsx`
-
-```typescript
-import { SignUp } from '@clerk/nextjs'
-
-export default function SignUpPage() {
-  return (
-    <div className="flex items-center justify-center min-h-screen">
-      <SignUp />
-    </div>
-  )
-}
-```
-
-**Test:** Visit `/sign-in` - you should see Clerk's sign-in page (free, beautiful, pre-built).
-
----
-
-## Why Do We Need a Database? (Important!)
-
-**The Problem:** When a user plays a hand, we need to **save** that data somewhere. If we don't:
-- ❌ User's progress disappears when they refresh the page
-- ❌ User's hand history is lost when they close the browser
-- ❌ User's statistics reset every time they visit
-- ❌ Different users can't have separate data
-
-**The Solution:** A **database** stores data permanently (like a spreadsheet in the cloud).
-
-**Think of it like this:**
-- **Without database**: Like writing on paper - it disappears when you refresh
-- **With database**: Like saving to Google Sheets - it's permanent and accessible
-
-**What Supabase is:**
-- Supabase = A free database service (like Google Sheets, but for apps)
-- You create "tables" (like spreadsheet columns) to organize data
-- You use JavaScript code to save/load data (not SQL in your app code!)
-
-**The SQL queries you see:**
-- You run them **once** in Supabase's dashboard to create the table structure
-- After that, you use **JavaScript** to interact with the database
-- Think of SQL as "setting up the spreadsheet columns" - you do it once, then use JavaScript to add/read rows
-
-**What we're storing:**
-- Each user's hand history (what cards they got, what they did)
-- Each user's statistics (how many hands, how many correct, etc.)
-- User profile info (email, username)
-
-**You only write SQL once** - to create the tables. After that, everything is JavaScript!
-
-**Simple Example:**
-
-**Without Database (Bad):**
-```javascript
-// User plays a hand
-let handHistory = []  // Stored in browser memory
-handHistory.push({ cards: ['A♠', 'K♥'], action: 'raise' })
-
-// User refreshes page → handHistory = [] (data lost!)
-```
-
-**With Database (Good):**
-```javascript
-// User plays a hand
-await supabase.from('hand_history').insert({
-  cards: ['A♠', 'K♥'],
-  action: 'raise'
-})
-
-// User refreshes page → Data is still there!
-// You can load it back: await supabase.from('hand_history').select()
-```
-
-**The SQL you write once** = Creating the "spreadsheet structure"  
-**The JavaScript you write** = Adding/reading data from that spreadsheet
-
----
-
-## Step 2: Set Up Supabase (Database) - FREE
-
-1. Go to [supabase.com](https://supabase.com) → Sign up (free account)
-2. Create new project (free tier is plenty)
-3. Copy your project URL and anon key from Settings → API
-4. Add to `.env.local`:
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-```
-
-5. Create `lib/supabase.ts`:
-
-```typescript
-import { createClient } from '@supabase/supabase-js'
-
-export const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
-```
-
-6. In Supabase Dashboard → SQL Editor, run this **once** to create the tables:
-
-```sql
--- This creates the "spreadsheet columns" - you only do this once!
-
--- Table 1: Store user info (links Clerk users to our database)
-CREATE TABLE user_profiles (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    clerk_user_id TEXT UNIQUE NOT NULL,
-    email TEXT,
-    username TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Table 2: Store each hand a user plays
-CREATE TABLE hand_history (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID REFERENCES user_profiles(id) ON DELETE CASCADE,
-    cards TEXT[] NOT NULL,
-    position TEXT NOT NULL,
-    action_taken TEXT NOT NULL,
-    gto_recommendation TEXT,
-    is_correct BOOLEAN,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Table 3: Store user statistics (total hands, accuracy, etc.)
-CREATE TABLE user_stats (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID REFERENCES user_profiles(id) ON DELETE CASCADE UNIQUE,
-    total_hands INTEGER DEFAULT 0,
-    correct_actions INTEGER DEFAULT 0,
-    gto_compliance DECIMAL(5,2) DEFAULT 0.00,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-```
-
-**What this does:** Creates 3 "tables" (like 3 spreadsheets) to store:
-1. User profiles
-2. Hand history (every hand played)
-3. User statistics
-
-**After this, you never write SQL again!** You'll use JavaScript code (shown in Step 7) to save/load data.
-
----
-
-## Step 3: Create Protected Game Page
-
-Create `app/game/page.tsx`:
-
-```typescript
-import { auth } from '@clerk/nextjs'
-import { redirect } from 'next/navigation'
-
-export default async function GamePage() {
-  const { userId } = await auth()
-  
-  if (!userId) {
-    redirect('/sign-in')
-  }
-  
-  return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-3xl font-bold">Poker GTO Trainer</h1>
-      {/* Game components go here */}
-    </div>
-  )
-}
-```
-
----
-
-## Step 4: Hand Dealing API Route
-
-Create `app/api/hands/deal/route.ts`:
-
-```typescript
-import { auth } from '@clerk/nextjs'
-import { NextResponse } from 'next/server'
-
-const suits = ['♠', '♥', '♦', '♣']
-const ranks = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A']
-const positions = ['UTG', 'MP', 'CO', 'BTN', 'SB', 'BB']
-
-export async function GET() {
-  const { userId } = await auth()
-  
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-  
-  // Deal 2 random cards
-  const card1 = ranks[Math.floor(Math.random() * ranks.length)] + 
-                suits[Math.floor(Math.random() * suits.length)]
-  const card2 = ranks[Math.floor(Math.random() * ranks.length)] + 
-                suits[Math.floor(Math.random() * suits.length)]
-  const position = positions[Math.floor(Math.random() * positions.length)]
-  
-  return NextResponse.json({
-    cards: [card1, card2],
-    position
-  })
-}
-```
-
----
-
-## Step 5: GTO Data
-
-1. Search online for "free GTO preflop charts"
-2. Create `lib/gto-ranges.json`:
-
-```json
-{
-  "opening_ranges": {
-    "UTG": "22+, A2s+, K9s+, Q9s+, J9s+, T9s, 98s, 87s, 76s, 65s, 54s, AJo+, KQo",
-    "MP": "22+, A2s+, K2s+, Q9s+, J9s+, T9s, 98s, 87s, 76s, 65s, 54s, A2o+, K9o+, Q9o+, J9o+",
-    "CO": "22+, A2s+, K2s+, Q2s+, J2s+, T2s+, 92s+, 82s+, 72s+, 62s+, 52s+, 42s+, 32s, A2o+, K2o+, Q2o+, J5o+, T6o+, 96o+, 86o+, 75o+, 64o+, 54o",
-    "BTN": "22+, A2s+, K2s+, Q2s+, J2s+, T2s+, 92s+, 82s+, 72s+, 62s+, 52s+, 42s+, 32s, A2o+, K2o+, Q2o+, J5o+, T6o+, 96o+, 86o+, 75o+, 64o+, 54o",
-    "SB": "22+, A2s+, K2s+, Q2s+, J2s+, T2s+, 92s+, 82s+, 72s+, 62s+, 52s+, 42s+, 32s, A2o+, K2o+, Q2o+, J5o+, T6o+, 96o+, 86o+, 75o+, 64o+, 54o",
-    "BB": "22+, A2s+, K2s+, Q2s+, J2s+, T2s+, 92s+, 82s+, 72s+, 62s+, 52s+, 42s+, 32s, A2o+, K2o+, Q2o+, J5o+, T6o+, 96o+, 86o+, 75o+, 64o+, 54o"
-  }
-}
-```
-
-3. Create `lib/gto.ts`:
-
-```typescript
-import gtoRanges from './gto-ranges.json'
-
-export function parseHand(cards: string[]): { rank: string; suit: string }[] {
-  return cards.map(card => ({
-    rank: card[0],
-    suit: card[1]
-  }))
-}
-
-export function isHandInRange(hand: string[], position: string): boolean {
-  const range = gtoRanges.opening_ranges[position as keyof typeof gtoRanges.opening_ranges]
-  if (!range) return false
-  
-  // Simple check - expand this logic based on range format
-  // For now, return true for strong hands
-  const ranks = hand.map(c => c[0])
-  if (ranks[0] === ranks[1]) return true // Pairs
-  if (ranks.includes('A') || ranks.includes('K')) return true // High cards
-  
-  return false
-}
-
-export function getGTORecommendation(hand: string[], position: string) {
-  const inRange = isHandInRange(hand, position)
-  
-  if (inRange) {
-    return { action: 'raise', confidence: 0.85 }
-  } else {
-    return { action: 'fold', confidence: 0.90 }
-  }
-}
-```
-
----
-
-## Step 6: Connect Clerk to Supabase
-
-Create `app/api/sync-user/route.ts`:
-
-```typescript
-import { auth } from '@clerk/nextjs'
-import { createClient } from '@supabase/supabase-js'
-import { NextResponse } from 'next/server'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
-export async function POST() {
-  const { userId } = await auth()
-  
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-  
-  // Get user from Clerk
-  const clerkUser = await fetch(`https://api.clerk.com/v1/users/${userId}`, {
-    headers: {
-      Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}`,
-    },
-  }).then(res => res.json())
-  
-  // Create/update user in Supabase
-  const { data, error } = await supabase
-    .from('user_profiles')
-    .upsert({
-      clerk_user_id: userId,
-      email: clerkUser.email_addresses[0]?.email_address,
-      username: clerkUser.username || clerkUser.first_name,
-    })
-    .select()
-  
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-  
-  return NextResponse.json({ user: data[0] })
-}
-```
-
-Call this API when user signs in (add to your game page or use Clerk webhooks).
-
----
-
-## Step 7: Save Hand History (Using JavaScript, Not SQL!)
-
-**This is where you actually use the database!** You'll use JavaScript code to save data - no SQL needed.
-
-Create `app/api/hands/save/route.ts`:
-
-```typescript
-import { auth } from '@clerk/nextjs'
-import { createClient } from '@supabase/supabase-js'
-import { NextResponse } from 'next/server'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
-export async function POST(request: Request) {
-  const { userId } = await auth()
-  
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-  
-  const body = await request.json()
-  const { cards, position, action_taken, gto_recommendation, is_correct } = body
-  
-  // Get Supabase user_id from Clerk user_id
-  const { data: user } = await supabase
-    .from('user_profiles')
-    .select('id')
-    .eq('clerk_user_id', userId)
-    .single()
-  
-  if (!user) {
-    return NextResponse.json({ error: 'User not found' }, { status: 404 })
-  }
-  
-  // Save hand to database (using JavaScript, not SQL!)
-  // This adds a new "row" to the hand_history "spreadsheet"
-  const { data, error } = await supabase
-    .from('hand_history')  // The table we created with SQL earlier
-    .insert({              // Add a new row
-      user_id: user.id,
-      cards,
-      position,
-      action_taken,
-      gto_recommendation,
-      is_correct
-    })
-    .select()
-  
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-  
-  // Update user stats (using JavaScript, not SQL!)
-  // This updates a row in the user_stats "spreadsheet"
-  await supabase
-    .from('user_stats')  // The table we created with SQL earlier
-    .upsert({            // Update or create if doesn't exist
-      user_id: user.id,
-      total_hands: 1, // Increment this properly
-      correct_actions: is_correct ? 1 : 0,
-      gto_compliance: is_correct ? 100 : 0
-    })
-  
-  return NextResponse.json({ hand: data[0] })
-}
-```
-
----
-
-## Step 8: UI Components with shadcn/ui
-
-Install components you need:
-
-```bash
-npx shadcn-ui@latest add button
-npx shadcn-ui@latest add card
-npx shadcn-ui@latest add input
-npx shadcn-ui@latest add badge
-npx shadcn-ui@latest add slider
-```
-
-Use them in your game page:
-
-```typescript
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-
-// Example usage
-<Card className="p-6">
-  <h2>Your Cards</h2>
-  <div className="flex gap-2">
-    <Badge>{cards[0]}</Badge>
-    <Badge>{cards[1]}</Badge>
-  </div>
-  <div className="flex gap-2 mt-4">
-    <Button onClick={handleFold}>Fold</Button>
-    <Button onClick={handleCall}>Call</Button>
-    <Button onClick={handleBet}>Bet</Button>
-  </div>
-</Card>
-```
-
----
-
-## Step 9: Deployment (FREE)
-
-### Deploy to Vercel
-
-1. Push code to GitHub
-2. Go to [vercel.com](https://vercel.com) → Sign up (free)
-3. Click "Add New Project" → Import your GitHub repo
-4. Add environment variables (copy from `.env.local`)
-5. Click "Deploy"
-
-**That's it!** Your site is live at `your-app.vercel.app`
-
-### Update Clerk Settings
-
-1. In Clerk dashboard → Paths
-2. Add your Vercel URL to allowed URLs
-
-### Update Supabase (if needed)
-
-1. In Supabase dashboard → Settings → API
-2. Add Vercel URL to allowed origins (if using CORS)
-
----
-
-## Development Checklist
-
-- [ ] Next.js app created and running
-- [ ] Clerk account created, keys added to `.env.local`
-- [ ] ClerkProvider added to layout
-- [ ] Sign-in/sign-up pages created
-- [ ] Supabase project created, keys added
-- [ ] Database tables created
-- [ ] Protected game page created
-- [ ] Hand dealing API route works
-- [ ] GTO ranges added
-- [ ] Hand history saves to Supabase
-- [ ] UI built with shadcn/ui components
-- [ ] Deployed to Vercel
-
----
-
-## Free Tier Limits (More Than Enough)
-
-**Clerk:**
-- 10,000 monthly active users (free)
-- Unlimited sign-ups
-- All auth features included
-
-**Supabase:**
-- 500MB database (plenty for thousands of hands)
-- 2GB bandwidth/month
-- 50,000 monthly active users
-
-**Vercel:**
-- Unlimited deployments
-- 100GB bandwidth/month
-- Automatic HTTPS
-
-**All free tiers are sufficient for this project!**
-
----
-
-## Next Steps
-
-1. Build the poker table UI (use CSS/Tailwind to create table layout)
-2. Add card graphics (use images or SVG)
-3. Implement GTO lookup logic (expand the range checking)
-4. Add user stats dashboard
-5. Polish UI and add animations
-6. Add more scenarios (3-bet, 4-bet, etc.)
-
----
-
-## Resources
-
-- [Next.js Docs](https://nextjs.org/docs) - Free
-- [Clerk Docs](https://clerk.com/docs) - Free
-- [Supabase Docs](https://supabase.com/docs) - Free
-- [shadcn/ui Components](https://ui.shadcn.com) - Free
-- [Tailwind CSS Docs](https://tailwindcss.com/docs) - Free
-
-**Everything you need is free and well-documented!**
-
----
-
-## Notes
-
-- Start with basic functionality, polish later
-- Test each feature as you build it
-- Use TypeScript for better code quality
-- ML is optional - focus on core features first
-- All services have free tiers that are more than enough
+LEAK-WEIGHTED LOGIC (BACKEND REQUIREMENTS)
+Solver Outputs Required
+
+For each node:
+
+Base GTO strategy
+
+Alternative strategies (larger bets, more bluffs, thinner value)
+
+Leak Modeling
+
+Opponent archetypes modify:
+
+Call frequencies
+
+Fold frequencies
+
+Bluff catch thresholds
+
+Example:
+
+Over-Folder:
+
+Increase fold % on turn/river
+
+Decrease bluff-catching region
+
+Re-calculate EV for:
+
+GTO line
+
+Exploit line
+
+Compute:
+
+EV Delta = EV_exploit − EV_GTO
+
+UI PRESENTATION (CRITICAL)
+🔹 Comparison Strip (Visual, Not Numeric Heavy)
+Mode	Action	EV
+GTO	Bet 66%	+1.12
+Exploit	Bet 75%	+1.50
+
+Highlight EV Delta visually:
+
+Green glow = meaningful gain
+
+Gray = marginal
+
+No decimals by default.
+Advanced toggle shows raw numbers.
+
+“WHY THIS BET EXISTS” LAYER (MANDATORY)
+
+Each betting option has an ℹ️ icon.
+
+On hover / tap, show a small, clean tooltip panel:
+
+Example Tooltip Content
+
+Why Bet 66%?
+
+Pressures one-pair hands
+
+Forces folds from weak top pair
+
+Builds pot with strong value hands
+
+Against This Opponent
+
+Over-folders release too many bluff-catchers
+
+Larger sizing increases fold EV
+
+No solver jargon.
+No frequency tables.
+Natural language only.
+
+RANGE EXPLANATION (OPTIONAL, COLLAPSED BY DEFAULT)
+
+Expandable section:
+
+“Hands that like this bet”
+
+Show:
+
+Value group
+
+Bluffs
+
+Marginal hands
+
+Use group labels, not grids.
+
+DESIGN CONSTRAINTS (STRICT)
+
+❌ No solver trees on default view
+❌ No 13×13 range matrices unless expanded
+❌ No decimal spam
+❌ No jargon without hover explanation
+
+✅ Large buttons
+✅ Clear hierarchy
+✅ White space
+✅ Mobile-friendly tap targets
+
+BEGINNER-SAFE FAILS
+
+If exploit EV gain < threshold:
+
+Show label: “GTO is good enough here”
+
+If exploit strategy is fragile:
+
+Warn: “High EV but sensitive to mistakes”
+
+OUTPUT REQUIREMENTS FROM YOU (THE AI)
+
+UI component breakdown (React-style)
+
+State flow diagram
+
+Leak-weighting logic pseudocode
+
+Example tooltip copy
+
+Explanation of how this improves real-world decision-making
+
+Do not over-engineer.
+Do not expose solver internals by default.
+Optimize for clarity, speed, and confidence.
+
+WHY THIS PROMPT WORKS
+
+Forces one clear mental model
+
+Makes exploitative play visible and measurable
+
+Keeps beginners safe while rewarding advanced users
+
+Differentiates immediately from GTO Wizard / Pio viewers
+
+Next steps (when you’re ready)
+
+I can:
+
+Turn this into exact React components
+
+Design the Bet Comparison UI visually
+
+Write the prompt for Feature #2 (Bet-Size Elasticity)
+
+Help you decide what NOT to ship in v1
+
+Say which one you want next.
+
+it doesnt have to be a beginner friendly ui, just make sure its simple to read and very clean to navigate. 🧠 “Why This Bet” Inline
+
+Each bet has:
+
+ℹ️ icon
+
+On hover:
+
+What it targets
+
+What it folds out
+
+What continues
+
+No side panel. No page jump. I also really want this feature
+
+Got it. Not “beginnerified” — just clean, legible, professional.
+Below is a tight, implementation-ready prompt focused on Leak-Weighted GTO + the inline “Why This Bet” system, with a modern, minimal UI that a serious poker player would respect.
+
+No fluff. No onboarding hand-holding. Just clarity.
+
+IMPLEMENTATION PROMPT — Leak-Weighted GTO + Inline “Why This Bet”
+
+You are a senior poker-theory engineer and UI-focused frontend architect.
+
+Implement Leak-Weighted GTO Mode with a minimal, clean, professional UI, optimized for fast comprehension and zero navigation friction.
+
+The interface should feel closer to Bloomberg / Linear / Stripe than a training app.
+
+CORE UX PRINCIPLES (STRICT)
+
+Single-screen interaction
+
+No side panels
+
+No page transitions
+
+No modal explosions
+
+Information appears exactly where attention already is
+
+Everything readable in < 1 second
+
+LAYOUT STRUCTURE (ONE SCREEN)
+Top Bar
+
+Situation info (stack depth, position, board)
+
+Opponent archetype selector (compact dropdown)
+
+Solver-Like
+
+Over-Folds
+
+Station
+
+Scared
+
+Over-Aggro
+
+No icons. Text only. Subtle.
+
+Action Table (Primary Focus)
+
+A clean vertical list, not buttons floating everywhere.
+
+Action	Freq	EV	
+Bet 33%	Often	+1.12	ℹ️
+Bet 66%	Sometimes	+1.18	ℹ️
+Check	Rare	+0.97	ℹ️
+
+Entire row clickable
+
+No sliders
+
+No decimals by default (toggleable)
+
+EV delta highlighted if exploit mode on
+
+LEAK-WEIGHTED MODE
+Toggle (Top Right)
+
+◉ GTO
+
+◉ Exploit
+
+When Exploit is active:
+
+Frequencies + EV recomputed
+
+Subtle label appears:
+
+“Adjusted for opponent tendencies”
+
+No dramatic UI change.
+
+🧠 INLINE “WHY THIS BET” (MANDATORY FEATURE)
+Interaction
+
+Hover (desktop) or tap-hold (mobile) on ℹ️
+
+Tooltip appears adjacent to the action row
+
+No overlay blocking other UI
+
+Tooltip Content (Strict Format)
+Why Bet 66%
+
+Targets
+• One-pair hands
+• Weak top pair
+
+Folds Out
+• Missed draws
+• Low equity bluff-catchers
+
+Continues
+• Strong top pair+
+• Nut draws
+
+
+Rules
+
+Bullet points only
+
+No solver jargon
+
+No frequencies
+
+No EV numbers
+
+No sentences longer than one line
+
+Exploit Context (If Applicable)
+
+If Leak-Weighted mode is active, append:
+
+Exploit Note
+• Over-folders release too many bluff-catchers
+• Larger sizing increases fold EV
+
+
+This appears inside the same tooltip, not elsewhere.
+
+LOGIC REQUIREMENTS (BACKEND / MODEL)
+
+For each action:
+
+Precompute:
+
+Targeted hand classes
+
+Folded hand classes
+
+Continuing hand classes
+
+Use range clustering, not exact combos
+
+When opponent archetype changes:
+
+Adjust cluster weights
+
+Recompute EV
+
+Update tooltip text dynamically
+
+VISUAL DESIGN CONSTRAINTS
+
+Font: Inter / Geist / SF Pro
+
+Light or dark neutral theme
+
+No gradients
+
+No poker-themed colors
+
+Max 2 accent colors
+
+Tooltip:
+
+Soft shadow
+
+Rounded corners
+
+Appears in ≤ 100ms
+
+Disappears instantly on mouse leave
+
+WHAT NOT TO DO
+
+❌ No side explanation panel
+❌ No clicking into another page
+❌ No solver trees on hover
+❌ No range matrices in tooltips
+❌ No animation that delays information
+
+OUTPUT EXPECTED FROM YOU
+
+Component structure (React-style)
+
+Tooltip data schema
+
+Leak-weighting logic pseudocode
+
+Example tooltip content for 2 actions
+
+Explanation of how inline explanations reduce cognitive load
+
+Optimize for:
+
+speed
+
+precision
+
+professional clarity
+
+WHY THIS FEATURE IS A KILLER
+
+Teaches intent, not memorization
+
+Keeps users in flow
+
+Makes exploit logic legible without “training mode”
+
+No competitor executes this cleanly
+
+If you want next:
+
+Feature #2 prompt (Bet-Size Elasticity, done cleanly)
+
+Design system tokens (spacing, typography, color)
+
+Data model for hand-class clustering
+
+MASTER AI PROMPT — Human-Leak–Aware GTO + “Why This Bet Exists”
+
+You are a senior poker-theory engineer and a product-focused frontend architect.
+
+Your task is to design and implement a Human-Leak–Aware GTO Mode for a poker solver–based web app.
+
+This feature must clearly show how pure GTO differs from exploitative play against real humans, using simple, clean visualizations and inline tactical explanations.
+
+Do not build a training toy. Build a professional, modern poker tool.
+
+FEATURE GOALS (NON-NEGOTIABLE)
+
+Allow the user to select an opponent archetype
+
+Re-weight solver EVs based on population mistakes
+
+Show:
+
+Pure GTO line
+
+Max-exploit line
+
+EV delta between them
+
+Provide an inline “Why This Bet Exists” explanation on hover
+
+Keep everything on one screen
+
+Zero solver jargon in the UI
+
+1️⃣ OPPONENT ARCHETYPE SELECTION
+
+Implement a compact selector with these options:
+
+Solver-Like Reg
+
+Over-Folds (especially river)
+
+Station / Calls Too Much
+
+Scared Money
+
+Over-Aggressive / Over-Bluffs
+
+Rules
+
+Single-select
+
+Text only (no icons)
+
+Default = Solver-Like Reg
+
+Changing archetype recomputes EV immediately
+
+2️⃣ LEAK-WEIGHTED EV MODEL
+Base Inputs
+
+GTO strategy outputs:
+
+Frequencies
+
+EV per action
+
+Range distributions
+
+Leak Adjustments
+
+Each archetype modifies:
+
+Fold frequencies
+
+Call frequencies
+
+Bluff-catch thresholds
+
+Example:
+
+Over-Folder:
+
+Increase folds vs large bets
+
+Reduce bluff-catch range
+
+Recalculate:
+
+EV_exploit(action) = Σ (adjusted outcomes × payoff)
+EV_delta = EV_exploit − EV_GTO
+
+
+Do not change the GTO baseline.
+Exploit line must be computed relative to it.
+
+3️⃣ ACTION DISPLAY (CORE UI)
+
+Render actions in a clean vertical table:
+
+Action	Frequency	EV	
+Bet 33%	Often	+1.12	ℹ️
+Bet 66%	Sometimes	+1.28	ℹ️
+Check	Rare	+0.94	ℹ️
+
+Rules
+
+Entire row is clickable
+
+EV delta highlighted when exploit mode active
+
+No decimals by default (toggleable)
+
+4️⃣ PURE GTO VS MAX-EXPLOIT COMPARISON
+
+When exploit mode is active, visually show:
+
+GTO line
+
+Exploit-max line
+
+EV delta
+
+Example:
+
+GTO: Bet 66% → +1.12
+Exploit: Bet 75% → +1.47
+ΔEV: +0.35
+
+
+If EV delta is small:
+
+“GTO is sufficient here”
+
+5️⃣ 🧠 INLINE “WHY THIS BET EXISTS” (CRITICAL)
+
+Each action has an ℹ️ icon.
+
+Interaction
+
+Hover (desktop) / tap-hold (mobile)
+
+Tooltip appears next to the action
+
+No side panels
+
+No page transitions
+
+Tooltip Content Structure (STRICT)
+Why Bet 66%
+
+Applies Pressure To
+• One-pair hands
+• Weak top pair
+
+Folds Out
+• Missed draws
+• Low-equity bluff-catchers
+
+Continues
+• Strong top pair+
+• Nut draws
+
+
+If exploit mode is active, append:
+
+Exploit Note
+• Over-folders release bluff-catchers too often
+• Larger sizing increases fold EV
+
+
+Rules
+
+Bullet points only
+
+No frequencies
+
+No solver terminology
+
+No EV numbers
+
+One-line bullets max
+
+6️⃣ DATA MODEL REQUIREMENTS
+
+For each action, precompute:
+
+Targeted hand clusters
+
+Folding hand clusters
+
+Continuing hand clusters
+
+Use range grouping, not individual combos.
+
+Tooltip content must update dynamically when:
+
+Board changes
+
+Opponent archetype changes
+
+7️⃣ VISUAL & UX CONSTRAINTS
+
+One screen
+
+No modals
+
+No trees
+
+No range matrices
+
+Neutral color palette
+
+Typography-driven hierarchy
+
+Tooltips appear instantly (<100ms)
+
+8️⃣ OUTPUT EXPECTED FROM YOU
+
+Architecture overview
+
+UI component breakdown
+
+EV re-weighting pseudocode
+
+Tooltip data schema
+
+Example output for two opponent archetypes
+
+Explanation of why this feature teaches better than raw GTO
+
+DESIGN PHILOSOPHY
+
+Existing GTO tools show what the solver does.
+This feature shows what humans do wrong — and how to punish it.
+
+Build accordingly.
+TOOLTIPS OVER PANELS
+
+All explanations must:
+
+appear on hover
+
+disappear instantly
+
+never block other UI
+
+stay spatially anchored
+
+No sidebars.
+No bottom drawers.
+No pop-out windows.
+
+RANGE & DATA VISUALIZATION RULES
+
+Default:
+
+Grouped hand classes
+
+Natural language labels
+
+Advanced toggle:
+
+Full matrices
+
+Frequencies
+
+EV breakdowns
+
+Never show both at once.
+
+SPACING & READABILITY
+
+Generous vertical spacing
+
+No dense clusters
+
+If unsure → remove 10% of UI elements
+
+Whitespace = signal.
+
+INTERACTION FEEDBACK
+
+Every action must:
+
+respond instantly
+
+show hover state
+
+show disabled reason
+
+No silent failures. Ever.
+
+THEMES & STYLE
+
+Neutral palette (gray-based)
+
+Light or dark, but not both at once
+
+No poker clichés
+
+No gradients
+
+No flashy animations
+
+OUTPUT REQUIRED FROM YOU
+
+Before → After UI structure comparison
+
+Screen layout diagram (textual is fine)
+
+Component list with responsibility
+
+UI ruleset (what never appears by default)
+
+Explanation of how cognitive load is reduced
+
+SUCCESS CRITERIA
+
+A user should be able to:
+
+understand the recommendation in < 1 second
+
+understand the reasoning in < 3 seconds
+
+never feel lost or overwhelmed
