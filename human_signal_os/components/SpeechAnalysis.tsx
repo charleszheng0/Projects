@@ -365,8 +365,9 @@ export default function SpeechAnalysis() {
   const faceHistoryRef   = useRef<FaceLandmark[][]>([]);
   const poseDataRef      = useRef<PoseLandmark[] | undefined>(undefined);
   const liveScoreRef     = useRef(0);
-  const isRecordingRef   = useRef(false);
-  const historyRef       = useRef<HistoryEntry[]>([]);
+  const isRecordingRef        = useRef(false);
+  const historyRef            = useRef<HistoryEntry[]>([]);
+  const recordingAbortedRef   = useRef(false);
 
   // Keep refs in sync
   useEffect(() => { isRecordingRef.current = status === "recording"; }, [status]);
@@ -452,11 +453,17 @@ export default function SpeechAnalysis() {
 
   // ── stopRecording ──────────────────────────────────────────────────────────
   const stopRecording = useCallback(() => {
+    recordingAbortedRef.current = true;
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
     const mr = mediaRecorderRef.current;
-    if (mr && mr.state !== "inactive") mr.stop();
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = null;
+    if (mr && mr.state !== "inactive") {
+      mr.stop(); // fires onstop → sendAudio
+    } else if (!mr) {
+      // Recorder never created (stop clicked while getUserMedia was pending)
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+      setStatus("idle");
+    }
   }, []);
 
   // ── runDemo: analyze hardcoded transcript without recording ───────────────
@@ -492,6 +499,7 @@ export default function SpeechAnalysis() {
 
   // ── startRecording ─────────────────────────────────────────────────────────
   async function startRecording() {
+    // ① Reset
     setError("");
     setTranscript("");
     setAnalysis(null);
@@ -502,41 +510,87 @@ export default function SpeechAnalysis() {
     liveScoreRef.current = 0;
     faceHistoryRef.current = [];
     setMeshScore(0.5);
+    recordingAbortedRef.current = false;
 
-    let stream: MediaStream;
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch {
-      setError("Microphone access denied. Please allow mic access and try again.");
-      setStatus("error");
-      return;
-    }
-    streamRef.current = stream;
-
-    const mimeType = getAudioMime();
-    const mr = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-    mediaRecorderRef.current = mr;
-    chunksRef.current = [];
-
-    mr.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
-    mr.onstop = () => {
-      const blob = new Blob(chunksRef.current, { type: mimeType || "audio/webm" });
-      sendAudio(blob, mimeType);
-    };
-
-    mr.start(250);
+    // ② IMMEDIATE visual feedback — button turns red + countdown starts NOW,
+    //    before any async work so the UI never feels unresponsive on click.
     setStatus("recording");
-
     timerRef.current = setInterval(() => {
       elapsedRef.current += 1;
       setElapsed(elapsedRef.current);
       if (elapsedRef.current >= MAX_SECS) stopRecording();
     }, 1000);
+
+    // ③ Guard: getUserMedia requires a secure context (HTTPS or localhost)
+    if (!navigator.mediaDevices?.getUserMedia) {
+      clearInterval(timerRef.current!); timerRef.current = null;
+      setError("Microphone API unavailable — page must be served over HTTPS or localhost.");
+      setStatus("error");
+      return;
+    }
+
+    // ④ Request mic (shows the browser permission prompt)
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err) {
+      if (recordingAbortedRef.current) return; // user clicked Stop while waiting for permission
+      clearInterval(timerRef.current!); timerRef.current = null;
+      const isDenied = err instanceof DOMException &&
+        (err.name === "NotAllowedError" || err.name === "PermissionDeniedError");
+      setError(isDenied
+        ? "Microphone access denied — allow mic access in your browser/system settings and try again."
+        : `Could not access microphone: ${err instanceof Error ? err.message : String(err)}`);
+      setStatus("error");
+      return;
+    }
+
+    // If user clicked Stop while the permission prompt was showing, clean up and bail
+    if (recordingAbortedRef.current) { stream.getTracks().forEach((t) => t.stop()); return; }
+    streamRef.current = stream;
+
+    // ⑤ Create MediaRecorder — try preferred MIME, fall back to browser default
+    //    (some browsers report isTypeSupported=true but reject the MIME in the constructor)
+    const mimeType = getAudioMime();
+    let mr: MediaRecorder;
+    try {
+      mr = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+    } catch {
+      try {
+        mr = new MediaRecorder(stream);
+      } catch (err2) {
+        clearInterval(timerRef.current!); timerRef.current = null;
+        stream.getTracks().forEach((t) => t.stop()); streamRef.current = null;
+        setError(`Cannot create recorder: ${err2 instanceof Error ? err2.message : String(err2)}`);
+        setStatus("error"); return;
+      }
+    }
+    mediaRecorderRef.current = mr;
+    chunksRef.current = [];
+
+    const actualMime = mr.mimeType || mimeType || "audio/webm";
+
+    mr.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+    mr.onerror = () => { setError("Recording error — please try again."); setStatus("error"); };
+    mr.onstop = () => {
+      const blob = new Blob(chunksRef.current, { type: actualMime });
+      sendAudio(blob, actualMime);
+    };
+
+    // ⑥ Start recording
+    try {
+      mr.start(250);
+    } catch (err) {
+      clearInterval(timerRef.current!); timerRef.current = null;
+      stream.getTracks().forEach((t) => t.stop()); streamRef.current = null; mediaRecorderRef.current = null;
+      setError(`Could not start recording: ${err instanceof Error ? err.message : String(err)}`);
+      setStatus("error");
+    }
   }
 
   function handleRecordBtn() {
     if (status === "recording") { stopRecording(); }
-    else if (status === "idle" || status === "done" || status === "error") { startRecording(); }
+    else if (canRecord) { startRecording(); }
   }
 
   async function handleCopy() {
@@ -691,33 +745,55 @@ export default function SpeechAnalysis() {
           </div>
 
           {/* Controls strip */}
-          <div className="shrink-0 flex flex-col gap-3 px-6 py-4"
+          <div className="shrink-0 flex flex-col gap-2.5 px-6 py-4"
             style={{ background: "var(--bg-panel)", borderTop: "1px solid var(--border-subtle)" }}>
+
+            {/* ── Status pipeline ── */}
+            <div className="flex items-center justify-center gap-2 text-[10px] font-mono tracking-widest">
+              {[
+                { label: "IDLE",       active: status === "idle" || status === "error",             color: status === "error" ? "var(--red)" : "var(--text-muted)" },
+                { label: "RECORDING",  active: status === "recording",                              color: "var(--red)"   },
+                { label: "PROCESSING", active: status === "processing" || status === "analyzing",   color: "var(--blue)"  },
+                { label: "DONE",       active: status === "done",                                   color: "var(--green)" },
+              ].map((step, i, arr) => (
+                <div key={step.label} className="flex items-center gap-2">
+                  <span style={{
+                    color: step.active ? step.color : "var(--border-default)",
+                    fontWeight: step.active ? 700 : 400,
+                    transition: "color 0.2s, font-weight 0.1s",
+                  }}>
+                    {step.label}
+                  </span>
+                  {i < arr.length - 1 && (
+                    <span style={{ color: "var(--border-default)" }}>→</span>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* ── Progress bar + countdown ── */}
             <div className="flex items-center gap-3">
-              <span className="text-xs font-mono tabular-nums w-10 text-right" style={{ color: "var(--text-muted)" }}>
-                {isRecording ? formatTime(elapsed) : "00:00"}
-              </span>
               <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: "var(--bg-elevated)" }}>
                 <div className="h-full rounded-full"
-                  style={{ width: `${progress * 100}%`, background: isRecording ? "var(--red)" : "var(--border-default)",
-                    transition: isRecording ? "width 1s linear" : "none" }} />
+                  style={{
+                    width: `${progress * 100}%`,
+                    background: isRecording ? "var(--red)" : "var(--border-default)",
+                    transition: isRecording ? "width 1s linear" : "none",
+                  }} />
               </div>
-              <span className="text-xs font-mono tabular-nums w-10" style={{ color: "var(--text-muted)" }}>
-                {formatTime(MAX_SECS)}
+              <span className="text-xs font-mono tabular-nums shrink-0" style={{ color: isRecording ? "var(--red)" : "var(--text-muted)", minWidth: 36 }}>
+                {isRecording ? formatTime(MAX_SECS - elapsed) : formatTime(MAX_SECS)}
               </span>
             </div>
+
+            {/* ── Buttons ── */}
             <div className="flex items-center justify-center gap-3">
-              {/* Demo button — only when idle/done/error */}
               {!isRecording && (
                 <button
                   onClick={runDemo}
                   disabled={!canRecord}
                   className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-medium transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
-                  style={{
-                    background: "var(--bg-elevated)",
-                    border: "1px solid var(--border-default)",
-                    color: "var(--text-secondary)",
-                  }}
+                  style={{ background: "var(--bg-elevated)", border: "1px solid var(--border-default)", color: "var(--text-secondary)" }}
                 >
                   <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
                     <path d="M2 2l7 3.5L2 9V2z" fill="currentColor" />
@@ -726,19 +802,33 @@ export default function SpeechAnalysis() {
                 </button>
               )}
 
-              <button onClick={handleRecordBtn} disabled={!canRecord}
+              <button
+                onClick={handleRecordBtn}
+                disabled={!canRecord}
                 className="flex items-center gap-2.5 px-5 py-2.5 rounded-full text-sm font-semibold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
-                style={{ background: isRecording ? "var(--red)" : "linear-gradient(135deg, var(--blue), var(--purple))",
-                  color: "white", boxShadow: isRecording ? "0 0 0 6px rgba(244,63,94,0.12)" : "0 0 0 6px rgba(59,130,246,0.1)",
-                  transition: "all 0.2s" }}>
+                style={{
+                  background: isRecording ? "var(--red)" : "linear-gradient(135deg, var(--blue), var(--purple))",
+                  color: "white",
+                  boxShadow: isRecording ? "0 0 0 6px rgba(244,63,94,0.12)" : "0 0 0 6px rgba(59,130,246,0.1)",
+                  transition: "background 0.15s, box-shadow 0.15s",
+                }}
+              >
                 {isRecording ? (
-                  <><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="3" y="3" width="8" height="8" rx="1.5" fill="white" /></svg>Stop</>
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                      <rect x="3" y="3" width="8" height="8" rx="1.5" fill="white" />
+                    </svg>
+                    Stop Recording
+                  </>
                 ) : (
-                  <><svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                    <path d="M7 1.5a2 2 0 0 1 2 2v4a2 2 0 0 1-4 0v-4a2 2 0 0 1 2-2z" fill="white" />
-                    <path d="M2.5 6.5a4.5 4.5 0 0 0 9 0" stroke="white" strokeWidth="1.3" strokeLinecap="round" />
-                    <path d="M7 11v2" stroke="white" strokeWidth="1.3" strokeLinecap="round" />
-                  </svg>{status === "done" || status === "error" ? "Record Again" : "Start Recording"}</>
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                      <path d="M7 1.5a2 2 0 0 1 2 2v4a2 2 0 0 1-4 0v-4a2 2 0 0 1 2-2z" fill="white" />
+                      <path d="M2.5 6.5a4.5 4.5 0 0 0 9 0" stroke="white" strokeWidth="1.3" strokeLinecap="round" />
+                      <path d="M7 11v2" stroke="white" strokeWidth="1.3" strokeLinecap="round" />
+                    </svg>
+                    {status === "done" || status === "error" ? "Record Again" : "Start Recording"}
+                  </>
                 )}
               </button>
             </div>

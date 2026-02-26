@@ -54,6 +54,42 @@ function norm(v: number, lo: number, hi: number): number {
   return clamp((v - lo) / (hi - lo));
 }
 
+// ── Calibration types + localStorage helpers ──────────────────────────────────
+
+interface PersonalBaseline {
+  neutralNoseTipVariance: number;
+  neutralShoulderYDiff: number;
+  neutralMouthCornerDelta: number; // smileLift at neutral face
+  neutralBrowGap: number;
+  neutralEyeRatio: number;
+  neutralLandmarkVariance: number;
+  neutralShoulderSpan: number;
+  neutralChinRatio: number;
+}
+
+interface CalibFrame {
+  noseTipY: number;
+  smileLift: number;
+  landmarkVar: number;
+  shoulderYDiff: number; // NaN if pose not available
+  browGap: number;
+  eyeRatio: number;
+  chinRatio: number;
+  shoulderSpan: number; // NaN if pose not available
+}
+
+const LS_KEY = "hsos_baseline";
+
+function loadBaseline(): PersonalBaseline | null {
+  try { return JSON.parse(localStorage.getItem(LS_KEY) ?? "null"); } catch { return null; }
+}
+function saveBaseline(b: PersonalBaseline) {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(b)); } catch {}
+}
+function clearBaseline() {
+  try { localStorage.removeItem(LS_KEY); } catch {}
+}
+
 // ── Scoring types ─────────────────────────────────────────────────────────────
 
 export interface Signal {
@@ -72,11 +108,13 @@ interface ScoreResult {
 /**
  * CONFIDENT
  * Measures: shoulder symmetry (pose), head jitter (face history), chin position.
+ * Chin scoring FIXED: lower ratio (chin up) = higher score.
  */
 function scoreConfident(
   face: FaceLandmark[],
   history: FaceLandmark[][],
   pose?: PoseLandmark[],
+  baseline?: PersonalBaseline | null,
 ): ScoreResult {
   const signals: Signal[] = [];
 
@@ -84,31 +122,31 @@ function scoreConfident(
   const slice10 = history.slice(-10);
   const noseTipYs = slice10.map(f => f[F.NOSE_TIP]?.y ?? 0);
   const jitter = variance(noseTipYs);
-  // jitter < 5e-6 = very stable; > 4e-5 = noticeably moving
-  const stabilityScore = norm(jitter, 4e-5, 4e-7) ; // inverted
+  const stabilityScore = baseline
+    ? norm(jitter, Math.max(baseline.neutralNoseTipVariance, 5e-8) * 6, 0)
+    : norm(jitter, 4e-5, 4e-7);
   signals.push({ label: "Head Stability", score: stabilityScore, passing: stabilityScore > 0.6 });
 
-  // Shoulder Level — |left.y − right.y| from pose
+  // Shoulder Level — |left.y − right.y| from pose (absolute — symmetry is universal)
   let shoulderScore = 0.5;
   if (pose?.[11] && pose?.[12]) {
     const yDiff = Math.abs(pose[11].y - pose[12].y);
-    // < 0.015 = level; > 0.06 = clearly uneven
     shoulderScore = norm(yDiff, 0.06, 0.015);
   }
   signals.push({ label: "Shoulder Level", score: shoulderScore, passing: shoulderScore > 0.6 });
 
-  // Chin Position — nose should sit ~35% of face-height below the eyes
+  // Chin Position — FIXED: lower ratio = chin raised = higher confidence score
   const eyeCY = mean([face[F.L_EYE_TOP]?.y ?? 0.38, face[F.R_EYE_TOP]?.y ?? 0.38]);
   const nosY  = face[F.NOSE_TIP]?.y ?? 0.55;
   const chinY = face[F.CHIN]?.y ?? 0.75;
-  const fhd   = (face[F.FOREHEAD_TOP]?.y ?? 0.20);
+  const fhd   = face[F.FOREHEAD_TOP]?.y ?? 0.20;
   const faceH = chinY - fhd;
   const ratio = faceH > 0.01 ? (nosY - eyeCY) / faceH : 0.35;
-  // ideal 0.28–0.46; tucked < 0.25; craned > 0.50
-  const chinScore =
-    ratio >= 0.28 && ratio <= 0.46 ? 1 :
-    ratio < 0.28  ? norm(ratio, 0.14, 0.28) :
-                    norm(ratio, 0.58, 0.46);
+  // With baseline: reward chin above personal neutral
+  // Without baseline: inverted norm — lower ratio (chin up) → higher score
+  const chinScore = baseline
+    ? norm(baseline.neutralChinRatio - ratio, -0.12, 0.10)
+    : norm(ratio, 0.55, 0.20);
   signals.push({ label: "Chin Position", score: chinScore, passing: chinScore > 0.6 });
 
   return { total: mean(signals.map(s => s.score)), signals };
@@ -118,29 +156,32 @@ function scoreConfident(
  * FRIENDLY
  * Measures: smile lift (mouth corners), brow raise, slight head tilt.
  */
-function scoreFriendly(face: FaceLandmark[]): ScoreResult {
+function scoreFriendly(
+  face: FaceLandmark[],
+  baseline?: PersonalBaseline | null,
+): ScoreResult {
   const signals: Signal[] = [];
 
   // Smile — mouth corners Y vs mouth centre Y
-  // In image coords y=0 is top; smiling lifts corners (smaller y than centre)
-  const cornerY  = mean([face[F.MOUTH_L]?.y ?? 0.65, face[F.MOUTH_R]?.y ?? 0.65]);
-  const centreY  = mean([face[F.MOUTH_TOP]?.y ?? 0.63, face[F.MOUTH_BOT]?.y ?? 0.67]);
+  const cornerY   = mean([face[F.MOUTH_L]?.y ?? 0.65, face[F.MOUTH_R]?.y ?? 0.65]);
+  const centreY   = mean([face[F.MOUTH_TOP]?.y ?? 0.63, face[F.MOUTH_BOT]?.y ?? 0.67]);
   const smileLift = centreY - cornerY; // positive = corners above centre = smile
-  // neutral ≈ −0.005..+0.005; smile ≈ +0.01..+0.03
-  const smileScore = norm(smileLift, -0.005, 0.025);
+  const smileScore = baseline
+    ? norm(smileLift - baseline.neutralMouthCornerDelta, -0.005, 0.020)
+    : norm(smileLift, -0.005, 0.025);
   signals.push({ label: "Smile", score: smileScore, passing: smileScore > 0.5 });
 
   // Eyebrow Raise — gap between inner brow and eye top
   const lBrowGap = (face[F.L_EYE_TOP]?.y ?? 0.38) - (face[F.L_BROW_INNER]?.y ?? 0.33);
   const rBrowGap = (face[F.R_EYE_TOP]?.y ?? 0.38) - (face[F.R_BROW_INNER]?.y ?? 0.33);
   const avgGap   = mean([lBrowGap, rBrowGap]);
-  // neutral ≈ 0.025; raised ≈ 0.045+
-  const browScore = norm(avgGap, 0.018, 0.050);
+  const browScore = baseline
+    ? norm(avgGap - baseline.neutralBrowGap, -0.008, 0.022)
+    : norm(avgGap, 0.018, 0.050);
   signals.push({ label: "Open Brows", score: browScore, passing: browScore > 0.45 });
 
-  // Head Tilt — asymmetry in eye heights (slight tilt = warmer)
+  // Head Tilt — asymmetry in eye heights (slight tilt = warmer), kept absolute
   const eyeAsym = Math.abs((face[F.L_EYE_TOP]?.y ?? 0) - (face[F.R_EYE_TOP]?.y ?? 0));
-  // 0.005–0.035 is "warm tilt"; 0 = neutral; >0.05 = too much
   const tiltScore =
     eyeAsym >= 0.005 && eyeAsym <= 0.035 ? 1 :
     eyeAsym < 0.005  ? norm(eyeAsym, 0, 0.005) :
@@ -155,28 +196,32 @@ function scoreFriendly(face: FaceLandmark[]): ScoreResult {
  * Measures: overall expressiveness (landmark variance), nodding (Y oscillation),
  * eye openness.
  */
-function scoreCharismatic(face: FaceLandmark[], history: FaceLandmark[][]): ScoreResult {
+function scoreCharismatic(
+  face: FaceLandmark[],
+  history: FaceLandmark[][],
+  baseline?: PersonalBaseline | null,
+): ScoreResult {
   const signals: Signal[] = [];
 
   // Expressiveness — total XY variance across key landmarks over last 30 frames
-  const KEY = [F.NOSE_TIP, F.MOUTH_L, F.MOUTH_R, F.L_EYE_OUTER, F.R_EYE_OUTER, F.L_BROW_INNER, F.R_BROW_INNER];
+  const KEY_LM = [F.NOSE_TIP, F.MOUTH_L, F.MOUTH_R, F.L_EYE_OUTER, F.R_EYE_OUTER, F.L_BROW_INNER, F.R_BROW_INNER];
   let totalVar = 0;
   if (history.length >= 3) {
-    for (const idx of KEY) {
+    for (const idx of KEY_LM) {
       const xs = history.map(f => f[idx]?.x ?? 0);
       const ys = history.map(f => f[idx]?.y ?? 0);
       totalVar += variance(xs) + variance(ys);
     }
-    totalVar /= KEY.length * 2;
+    totalVar /= KEY_LM.length * 2;
   }
-  // still ≈ 1e-6; lively ≈ 8e-5+
-  const expressScore = norm(totalVar, 1e-6, 8e-5);
+  const expressScore = baseline && baseline.neutralLandmarkVariance > 0
+    ? norm(totalVar / baseline.neutralLandmarkVariance, 0.3, 3.5)
+    : norm(totalVar, 1e-6, 8e-5);
   signals.push({ label: "Expressiveness", score: expressScore, passing: expressScore > 0.35 });
 
-  // Nodding — standard deviation of nose-tip Y (oscillation)
-  const noseTipYs = history.map(f => f[F.NOSE_TIP]?.y ?? 0);
-  const yStd = Math.sqrt(variance(noseTipYs));
-  // < 0.003 = still; > 0.015 = active nod
+  // Nodding — standard deviation of nose-tip Y (kept absolute)
+  const noseTipYsH = history.map(f => f[F.NOSE_TIP]?.y ?? 0);
+  const yStd = Math.sqrt(variance(noseTipYsH));
   const noddingScore = norm(yStd, 0.003, 0.018);
   signals.push({ label: "Head Movement", score: noddingScore, passing: noddingScore > 0.3 });
 
@@ -186,8 +231,9 @@ function scoreCharismatic(face: FaceLandmark[], history: FaceLandmark[][]): Scor
   const rH = Math.abs((face[F.R_EYE_TOP]?.y ?? 0) - (face[F.R_EYE_BOT]?.y ?? 0));
   const rW = Math.abs((face[F.R_EYE_OUTER]?.x ?? 0) - (face[F.R_EYE_INNER]?.x ?? 0));
   const openness = lW > 0.01 && rW > 0.01 ? mean([lH / lW, rH / rW]) : 0.25;
-  // squinting < 0.15; neutral ≈ 0.20–0.30; wide ≈ 0.32+
-  const eyeScore = norm(openness, 0.12, 0.34);
+  const eyeScore = baseline
+    ? norm(openness - baseline.neutralEyeRatio, -0.03, 0.06)
+    : norm(openness, 0.12, 0.34);
   signals.push({ label: "Eye Openness", score: eyeScore, passing: eyeScore > 0.5 });
 
   return { total: mean(signals.map(s => s.score)), signals };
@@ -195,12 +241,14 @@ function scoreCharismatic(face: FaceLandmark[], history: FaceLandmark[][]): Scor
 
 /**
  * OPEN
- * Measures: shoulder width (pose), both shoulders visible, chin not tucked.
+ * Measures: shoulder width (pose), both shoulders visible, chin up.
+ * Chin scoring FIXED: lower ratio (chin raised) = higher score.
  */
 function scoreOpen(
   face: FaceLandmark[],
   _history: FaceLandmark[][],
   pose?: PoseLandmark[],
+  baseline?: PersonalBaseline | null,
 ): ScoreResult {
   const signals: Signal[] = [];
 
@@ -208,27 +256,29 @@ function scoreOpen(
   let widthScore = 0.5;
   if (pose?.[11] && pose?.[12]) {
     const xSpan = Math.abs(pose[11].x - pose[12].x);
-    // < 0.12 = narrow; > 0.28 = wide
-    widthScore = norm(xSpan, 0.12, 0.28);
+    widthScore = baseline
+      ? norm(xSpan - baseline.neutralShoulderSpan, -0.06, 0.09)
+      : norm(xSpan, 0.12, 0.28);
   }
   signals.push({ label: "Shoulder Width", score: widthScore, passing: widthScore > 0.55 });
 
-  // Facing Forward — both shoulder landmarks visible to the camera
+  // Facing Forward — both shoulder landmarks visible to the camera (absolute)
   let facingScore = 0.5;
   if (pose?.[11] && pose?.[12]) {
     facingScore = mean([pose[11].visibility ?? 0.5, pose[12].visibility ?? 0.5]);
   }
   signals.push({ label: "Facing Forward", score: facingScore, passing: facingScore > 0.65 });
 
-  // Chin Up — same geometry as Confident but we reward any positive value
+  // Chin Up — FIXED: lower ratio (chin raised) = higher score
   const eyeCY  = mean([face[F.L_EYE_TOP]?.y ?? 0.38, face[F.R_EYE_TOP]?.y ?? 0.38]);
   const nosY   = face[F.NOSE_TIP]?.y ?? 0.55;
   const chinY  = face[F.CHIN]?.y ?? 0.75;
   const fhd    = face[F.FOREHEAD_TOP]?.y ?? 0.20;
   const faceH  = chinY - fhd;
   const ratio  = faceH > 0.01 ? (nosY - eyeCY) / faceH : 0.35;
-  // chin up = ratio in range; tucked < 0.25
-  const chinScore = norm(ratio, 0.20, 0.42);
+  const chinScore = baseline
+    ? norm(baseline.neutralChinRatio - ratio, -0.10, 0.10)
+    : norm(ratio, 0.55, 0.20); // inverted: lower ratio = chin up = higher score
   signals.push({ label: "Chin Up", score: chinScore, passing: chinScore > 0.55 });
 
   return { total: mean(signals.map(s => s.score)), signals };
@@ -269,7 +319,6 @@ function ModeTooltip({ text, children }: { text: string; children: React.ReactNo
         >
           {text}
         </div>
-        {/* caret */}
         <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px"
           style={{ width: 0, height: 0, borderLeft: "5px solid transparent", borderRight: "5px solid transparent", borderTop: "5px solid var(--border-strong)" }} />
       </div>
@@ -381,39 +430,164 @@ export default function LiveTracker() {
   const [score, setScore]     = useState(0);
   const [signals, setSignals] = useState<Signal[]>([]);
 
+  // Calibration state
+  const [calibState, setCalibState]       = useState<"calibrating" | "done">("calibrating");
+  const [baseline, setBaseline]           = useState<PersonalBaseline | null>(null);
+  const [toast, setToast]                 = useState<string | null>(null);
+  const [calibProgress, setCalibProgress] = useState(0); // 0–1 for the 3s fill bar
+
   // History buffers — refs avoid triggering renders on every frame
   const faceHistoryRef = useRef<FaceLandmark[][]>([]);
   const poseDataRef    = useRef<PoseLandmark[] | undefined>(undefined);
   const smoothRef      = useRef(0);
   const modeRef        = useRef(mode);
 
-  useEffect(() => { modeRef.current = mode; }, [mode]);
+  // Calibration refs — keep state accessible inside callbacks without dep changes
+  const baselineRef         = useRef<PersonalBaseline | null>(null);
+  const calibStateRef       = useRef<"calibrating" | "done">("calibrating");
+  const calibFramesRef      = useRef<CalibFrame[]>([]);
+  const calibStableStartRef = useRef<number | null>(null);
+
+  useEffect(() => { modeRef.current = mode; },             [mode]);
+  useEffect(() => { calibStateRef.current = calibState; }, [calibState]);
+  useEffect(() => { baselineRef.current   = baseline; },   [baseline]);
+
+  // Load saved baseline on mount
+  useEffect(() => {
+    const saved = loadBaseline();
+    if (saved) {
+      setBaseline(saved);
+      baselineRef.current   = saved;
+      setCalibState("done");
+      calibStateRef.current = "done";
+      setToast("Using saved calibration");
+      setTimeout(() => setToast(null), 2200);
+    }
+  }, []);
 
   // Called from FaceMeshCamera every frame a face is detected
   const handleFaceLandmarks = useCallback((landmarks: FaceLandmark[]) => {
-    // Update rolling buffer
+    // ① Update rolling history buffer
     faceHistoryRef.current.push(landmarks);
     if (faceHistoryRef.current.length > HISTORY_FRAMES) {
       faceHistoryRef.current.shift();
     }
 
-    // Score current mode
+    // ② Calibration sampling — runs every frame until baseline is locked
+    if (calibStateRef.current === "calibrating") {
+      const f = landmarks;
+
+      // Per-frame feature extraction
+      const noseTipY  = f[F.NOSE_TIP]?.y ?? 0;
+      const cornerY   = mean([f[F.MOUTH_L]?.y ?? 0.65, f[F.MOUTH_R]?.y ?? 0.65]);
+      const centreY   = mean([f[F.MOUTH_TOP]?.y ?? 0.63, f[F.MOUTH_BOT]?.y ?? 0.67]);
+      const smileLift = centreY - cornerY;
+      const lBrowGap  = (f[F.L_EYE_TOP]?.y ?? 0.38) - (f[F.L_BROW_INNER]?.y ?? 0.33);
+      const rBrowGap  = (f[F.R_EYE_TOP]?.y ?? 0.38) - (f[F.R_BROW_INNER]?.y ?? 0.33);
+      const browGap   = mean([lBrowGap, rBrowGap]);
+      const lH = Math.abs((f[F.L_EYE_TOP]?.y ?? 0) - (f[F.L_EYE_BOT]?.y ?? 0));
+      const lW = Math.abs((f[F.L_EYE_OUTER]?.x ?? 0) - (f[F.L_EYE_INNER]?.x ?? 0));
+      const rH = Math.abs((f[F.R_EYE_TOP]?.y ?? 0) - (f[F.R_EYE_BOT]?.y ?? 0));
+      const rW = Math.abs((f[F.R_EYE_OUTER]?.x ?? 0) - (f[F.R_EYE_INNER]?.x ?? 0));
+      const eyeRatio  = lW > 0.01 && rW > 0.01 ? mean([lH / lW, rH / rW]) : 0.25;
+      const eyeCY     = mean([f[F.L_EYE_TOP]?.y ?? 0.38, f[F.R_EYE_TOP]?.y ?? 0.38]);
+      const nosY      = f[F.NOSE_TIP]?.y ?? 0.55;
+      const cY        = f[F.CHIN]?.y ?? 0.75;
+      const fhd       = f[F.FOREHEAD_TOP]?.y ?? 0.20;
+      const faceHgt   = cY - fhd;
+      const chinRatio = faceHgt > 0.01 ? (nosY - eyeCY) / faceHgt : 0.35;
+      const pose      = poseDataRef.current;
+      const shoulderYDiff = (pose?.[11] && pose?.[12])
+        ? Math.abs(pose[11].y - pose[12].y) : NaN;
+      const shoulderSpan  = (pose?.[11] && pose?.[12])
+        ? Math.abs(pose[11].x - pose[12].x) : NaN;
+
+      // XY variance across key landmarks using current history
+      const CALIB_LM = [F.NOSE_TIP, F.MOUTH_L, F.MOUTH_R, F.L_EYE_OUTER, F.R_EYE_OUTER, F.L_BROW_INNER, F.R_BROW_INNER];
+      let landmarkVar = 0;
+      const hist = faceHistoryRef.current;
+      if (hist.length >= 3) {
+        for (const idx of CALIB_LM) {
+          landmarkVar += variance(hist.map(hf => hf[idx]?.x ?? 0));
+          landmarkVar += variance(hist.map(hf => hf[idx]?.y ?? 0));
+        }
+        landmarkVar /= CALIB_LM.length * 2;
+      }
+
+      // Push frame snapshot to rolling calib buffer
+      calibFramesRef.current.push({ noseTipY, smileLift, landmarkVar, shoulderYDiff, browGap, eyeRatio, chinRatio, shoulderSpan });
+      if (calibFramesRef.current.length > HISTORY_FRAMES) calibFramesRef.current.shift();
+
+      // Only evaluate stability once buffer is full (30 frames)
+      if (calibFramesRef.current.length === HISTORY_FRAMES) {
+        const cfs = calibFramesRef.current;
+
+        const noseTipYVar    = variance(cfs.map(cf => cf.noseTipY));
+        const avgSmileLift   = mean(cfs.map(cf => cf.smileLift));
+        const avgLandmarkVar = mean(cfs.map(cf => cf.landmarkVar));
+        const shoulderDiffs  = cfs.map(cf => cf.shoulderYDiff).filter(v => !isNaN(v));
+        const shoulderYDiffVar = shoulderDiffs.length > 1 ? variance(shoulderDiffs) : 0;
+
+        // Stability conditions
+        const isHeadStill    = noseTipYVar < 2e-5;           // <~3px movement (normalized)
+        const isNeutralSmile = Math.abs(avgSmileLift) < 0.007; // not smiling/frowning
+        const isRelaxed      = avgLandmarkVar < 3e-5;        // overall low face movement
+        const isShoulderOk   = shoulderDiffs.length < 5 || shoulderYDiffVar < 1e-4; // shoulders stable (or pose not loaded yet)
+
+        const allStable = isHeadStill && isNeutralSmile && isRelaxed && isShoulderOk;
+
+        if (allStable) {
+          if (calibStableStartRef.current === null) calibStableStartRef.current = Date.now();
+          const elapsed = Date.now() - calibStableStartRef.current;
+          setCalibProgress(Math.min(elapsed / 3000, 1));
+
+          if (elapsed >= 3000) {
+            // ── Lock in baseline ──────────────────────────────────────────
+            const spanVals = cfs.map(cf => cf.shoulderSpan).filter(v => !isNaN(v));
+            const newBaseline: PersonalBaseline = {
+              neutralNoseTipVariance:  Math.max(noseTipYVar, 5e-8),
+              neutralShoulderYDiff:    shoulderDiffs.length ? mean(shoulderDiffs) : 0.02,
+              neutralMouthCornerDelta: avgSmileLift,
+              neutralBrowGap:          mean(cfs.map(cf => cf.browGap)),
+              neutralEyeRatio:         mean(cfs.map(cf => cf.eyeRatio)),
+              neutralLandmarkVariance: Math.max(avgLandmarkVar, 1e-8),
+              neutralShoulderSpan:     spanVals.length ? mean(spanVals) : 0.20,
+              neutralChinRatio:        mean(cfs.map(cf => cf.chinRatio)),
+            };
+            baselineRef.current   = newBaseline;
+            setBaseline(newBaseline);
+            setCalibState("done");
+            calibStateRef.current = "done";
+            saveBaseline(newBaseline);
+            setCalibProgress(1);
+            setToast("Calibrated to your face");
+            setTimeout(() => setToast(null), 2200);
+          }
+        } else {
+          // Stability broken — reset timer
+          calibStableStartRef.current = null;
+          setCalibProgress(0);
+        }
+      }
+    }
+
+    // ③ Score current mode
     const face    = landmarks;
     const history = faceHistoryRef.current;
     const pose    = poseDataRef.current;
+    const bl      = baselineRef.current;
 
     let result: ScoreResult;
     switch (modeRef.current) {
-      case "confident":   result = scoreConfident(face, history, pose);   break;
-      case "friendly":    result = scoreFriendly(face);                   break;
-      case "charismatic": result = scoreCharismatic(face, history);       break;
-      case "open":        result = scoreOpen(face, history, pose);        break;
+      case "confident":   result = scoreConfident(face, history, pose, bl);   break;
+      case "friendly":    result = scoreFriendly(face, bl);                   break;
+      case "charismatic": result = scoreCharismatic(face, history, bl);       break;
+      case "open":        result = scoreOpen(face, history, pose, bl);        break;
       default:            result = { total: 0, signals: [] };
     }
 
-    // Exponential moving average for smooth animation
+    // ④ Exponential moving average for smooth animation
     smoothRef.current = smoothRef.current * 0.82 + result.total * 0.18;
-
     setScore(smoothRef.current);
     setSignals(result.signals);
   }, []);
@@ -430,7 +604,22 @@ export default function LiveTracker() {
     setSignals([]);
   };
 
-  const current     = MODES.find(m => m.id === mode)!;
+  function resetCalibration() {
+    clearBaseline();
+    setBaseline(null);
+    baselineRef.current   = null;
+    setCalibState("calibrating");
+    calibStateRef.current = "calibrating";
+    calibFramesRef.current = [];
+    calibStableStartRef.current = null;
+    setCalibProgress(0);
+    setToast(null);
+    smoothRef.current = 0;
+    setScore(0);
+    setSignals([]);
+  }
+
+  const current      = MODES.find(m => m.id === mode)!;
   const passingCount = signals.filter(s => s.passing).length;
 
   return (
@@ -445,6 +634,60 @@ export default function LiveTracker() {
             onPoseLandmarks={handlePoseLandmarks}
           />
           <CornerBrackets />
+
+          {/* ── Calibration overlay ── */}
+          {calibState === "calibrating" && (
+            <div
+              className="absolute bottom-0 inset-x-0 z-20 px-5 pb-5 pt-10"
+              style={{ background: "linear-gradient(to top, rgba(5,7,9,0.94) 0%, rgba(5,7,9,0.55) 65%, transparent 100%)" }}
+            >
+              <div className="flex flex-col gap-2 max-w-xs mx-auto">
+                <div className="flex items-center gap-2">
+                  <span
+                    className="w-1.5 h-1.5 rounded-full animate-pulse shrink-0"
+                    style={{ background: "var(--blue)" }}
+                  />
+                  <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+                    Sit naturally and look at the camera.
+                  </span>
+                </div>
+                <span className="text-xs" style={{ color: "var(--text-muted)", paddingLeft: "14px" }}>
+                  Calibrating to your face…
+                </span>
+                {/* 3-second fill bar — only visible once stable state is detected */}
+                <div
+                  className="h-px rounded-full overflow-hidden mt-1"
+                  style={{ background: "var(--bg-elevated)" }}
+                >
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${calibProgress * 100}%`,
+                      background: "var(--blue)",
+                      transition: calibProgress > 0 ? "width 0.25s linear" : "none",
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Toast notification ── */}
+          {toast && (
+            <div
+              className="absolute top-3 left-1/2 z-30 flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap"
+              style={{
+                background: "rgba(16,185,129,0.13)",
+                border: "1px solid rgba(16,185,129,0.28)",
+                color: "var(--green)",
+                backdropFilter: "blur(8px)",
+                animation: "hsosToastFade 2.2s ease forwards",
+              }}
+            >
+              <span className="w-1 h-1 rounded-full shrink-0" style={{ background: "var(--green)" }} />
+              {toast}
+            </div>
+          )}
         </div>
 
         {/* Status bar */}
@@ -457,19 +700,31 @@ export default function LiveTracker() {
             color: "var(--text-muted)",
           }}
         >
-          <StatusDot /><span>FaceMesh 468 pts</span>
+          <StatusDot /><span>Face tracking</span>
           <Sep />
-          <StatusDot /><span>Pose 33 pts</span>
-          <Sep />
-          <span>WASM · SIMD</span>
-          <Sep />
-          <span>720p</span>
+          <StatusDot /><span>Body tracking</span>
           <div className="flex-1" />
           <span style={{ color: signals.length ? "var(--text-secondary)" : "var(--text-muted)" }}>
             {signals.length
               ? `${passingCount}/${signals.length} signals passing`
               : "awaiting face…"}
           </span>
+          <Sep />
+          {/* Recalibrate button — always accessible */}
+          <button
+            onClick={resetCalibration}
+            className="font-mono transition-colors"
+            style={{
+              color: calibState === "calibrating" ? "var(--blue)" : "var(--text-muted)",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: "2px 4px",
+              fontSize: "inherit",
+            }}
+          >
+            {calibState === "calibrating" ? "Calibrating…" : "Recalibrate"}
+          </button>
         </div>
       </div>
 
@@ -507,7 +762,6 @@ export default function LiveTracker() {
                       <span className="text-xs leading-none mt-1" style={{ color: "var(--text-muted)" }}>
                         {m.description}
                       </span>
-                      {/* Active signal dots — green/red per passing signal */}
                       {active && signals.length > 0 && (
                         <div className="flex gap-1 mt-1.5">
                           {signals.map(s => (
@@ -547,6 +801,24 @@ export default function LiveTracker() {
               )}
             </div>
           </div>
+
+          {/* Calibration progress indicator in sidebar */}
+          {calibState === "calibrating" && (
+            <div
+              className="flex items-center gap-2 px-3 py-2 rounded-lg"
+              style={{ background: "var(--bg-elevated)", border: "1px solid var(--border-subtle)" }}
+            >
+              <span
+                className="w-1.5 h-1.5 rounded-full animate-pulse shrink-0"
+                style={{ background: "var(--blue)" }}
+              />
+              <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                {calibProgress > 0
+                  ? `Hold still… ${Math.round(calibProgress * 100)}%`
+                  : "Calibrating…"}
+              </span>
+            </div>
+          )}
 
           {/* Signal breakdown */}
           <div>
@@ -588,30 +860,30 @@ function ModeDescription({ mode, color }: { mode: Mode; color: string }) {
   const descriptions: Record<Mode, { bullets: string[] }> = {
     confident: {
       bullets: [
-        "Nose-tip jitter < 2px over 10 frames",
-        "Shoulder height difference < 6% of frame",
-        "Nose-to-eye ratio in natural range",
+        "Head stillness relative to your calibrated baseline",
+        "Shoulder height symmetry",
+        "Chin raised above your neutral position",
       ],
     },
     friendly: {
       bullets: [
-        "Mouth corners elevated above lip centre",
-        "Brow-to-eye gap > neutral baseline",
+        "Smile above your neutral mouth position",
+        "Brow gap above your resting baseline",
         "Slight eye-height asymmetry (warm tilt)",
       ],
     },
     charismatic: {
       bullets: [
-        "Landmark XY variance across 30 frames",
+        "Expressiveness above your calibrated variance",
         "Nose-tip Y oscillation (nod detection)",
-        "Eye height/width ratio",
+        "Eye openness above your resting ratio",
       ],
     },
     open: {
       bullets: [
-        "Shoulder span > 20% of frame width",
+        "Shoulder span wider than your baseline",
         "Both shoulders visible to camera",
-        "Nose-to-eye face ratio (chin angle)",
+        "Chin raised above your neutral position",
       ],
     },
   };

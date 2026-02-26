@@ -195,7 +195,7 @@ export default function Sidebar({
       >
         <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
         <span className="text-xs font-mono" style={{ color: "#4a4f5e" }}>
-          468 landmarks · 30 fps
+          Face analytics active
         </span>
       </div>
     </aside>

@@ -252,14 +252,22 @@ export default function FaceMeshCamera({
         // Feed FaceMesh (throttled — skip frame if previous still processing)
         if (faceMeshRef.current && !fmBusy) {
           fmBusy = true;
-          faceMeshRef.current.send({ image: video })
-            .catch(() => { fmBusy = false; });
+          try {
+            faceMeshRef.current.send({ image: video })
+              .catch(() => { fmBusy = false; });
+          } catch {
+            fmBusy = false;
+          }
         }
         // Feed Pose (independent throttle)
         if (poseRef.current && !poseBusy) {
           poseBusy = true;
-          poseRef.current.send({ image: video })
-            .catch(() => { poseBusy = false; });
+          try {
+            poseRef.current.send({ image: video })
+              .catch(() => { poseBusy = false; });
+          } catch {
+            poseBusy = false;
+          }
         }
       }
 

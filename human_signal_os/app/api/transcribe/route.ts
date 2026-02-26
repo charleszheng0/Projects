@@ -29,17 +29,14 @@ export async function POST(req: NextRequest) {
   // the audio mime type — no multipart encoding needed.
   let dgRes: Response;
   try {
-    dgRes = await fetch(
-      "https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&punctuate=true",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Token ${apiKey}`,
-          "Content-Type": mimeType,
-        },
-        body: await audioEntry.arrayBuffer(),
+    dgRes = await fetch("https://api.deepgram.com/v1/listen", {
+      method: "POST",
+      headers: {
+        Authorization: `Token ${apiKey}`,
+        "Content-Type": mimeType,
       },
-    );
+      body: await audioEntry.arrayBuffer(),
+    });
   } catch (err) {
     console.error("[/api/transcribe] Network error reaching Deepgram:", err);
     return NextResponse.json(
