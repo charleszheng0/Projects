@@ -215,10 +215,10 @@ export default function FaceMeshCamera({
         // Both pixels and landmark coords flip together → always aligned.
         ctx!.drawImage(video!, 0, 0, w, h);
 
-        // Pose skeleton
+        // Pose skeleton — barely-visible single white
         if (latestPose?.length) {
-          ctx!.strokeStyle = "rgba(255,255,255,0.22)";
-          ctx!.lineWidth   = 1.5;
+          ctx!.strokeStyle = "rgba(255,255,255,0.14)";
+          ctx!.lineWidth   = 1;
           for (const [ai, bi] of POSE_CONNECTIONS) {
             const a = latestPose[ai], b = latestPose[bi];
             if (!a || !b) continue;
@@ -228,23 +228,21 @@ export default function FaceMeshCamera({
             ctx!.lineTo(b.x * w, b.y * h);
             ctx!.stroke();
           }
-          ctx!.fillStyle = "rgba(255,255,255,0.60)";
+          ctx!.fillStyle = "rgba(255,255,255,0.22)";
           for (const lm of latestPose) {
             if ((lm.visibility ?? 1) < 0.5) continue;
             ctx!.beginPath();
-            ctx!.arc(lm.x * w, lm.y * h, 3.5, 0, 2 * Math.PI);
+            ctx!.arc(lm.x * w, lm.y * h, 2.5, 0, 2 * Math.PI);
             ctx!.fill();
           }
         }
 
-        // Face mesh dots — color driven by confidenceScore prop (EMA-smoothed)
-        displayScoreRef.current =
-          displayScoreRef.current * 0.88 + confidenceRef.current * 0.12;
+        // Face mesh contour — unobtrusive white at 25% opacity
         if (latestFace?.length) {
-          ctx!.fillStyle = scoreToRgb(displayScoreRef.current);
+          ctx!.fillStyle = "rgba(255,255,255,0.25)";
           for (const lm of latestFace) {
             ctx!.beginPath();
-            ctx!.arc(lm.x * w, lm.y * h, 1.4, 0, 2 * Math.PI);
+            ctx!.arc(lm.x * w, lm.y * h, 1.0, 0, 2 * Math.PI);
             ctx!.fill();
           }
         }
@@ -290,7 +288,7 @@ export default function FaceMeshCamera({
   }, []);
 
   return (
-    <div className="relative w-full h-full" style={{ background: "#050709" }}>
+    <div className="relative w-full h-full" style={{ background: "#000000" }}>
       {/* Hidden video — MUST be in DOM for browser to decode frames */}
       <video
         ref={videoRef}
@@ -307,11 +305,11 @@ export default function FaceMeshCamera({
       />
       {/* LIVE badge */}
       <div
-        className="absolute top-3 left-3 flex items-center gap-2 px-2.5 py-1 rounded text-xs font-mono z-10"
-        style={{ background: "rgba(8,10,15,0.85)", border: "1px solid var(--border-subtle)", backdropFilter: "blur(4px)" }}
+        className="absolute top-3 left-3 flex items-center gap-2 px-2.5 py-1 rounded-md z-10"
+        style={{ background: "rgba(0,0,0,0.75)", border: "1px solid #2A2A2A", backdropFilter: "blur(6px)" }}
       >
-        <span className="w-1.5 h-1.5 rounded-full animate-pulse inline-block" style={{ background: "var(--green)" }} />
-        <span style={{ color: "var(--text-secondary)" }}>LIVE</span>
+        <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: "#FF4757", boxShadow: "0 0 5px rgba(255,71,87,0.7)" }} />
+        <span className="text-[10px] font-mono tracking-widest uppercase" style={{ color: "#888888" }}>Live</span>
       </div>
     </div>
   );

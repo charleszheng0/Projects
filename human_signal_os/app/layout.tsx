@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Human Signal OS",
+  title: "Inflect",
   description: "Know how you sound before they do.",
 };
 

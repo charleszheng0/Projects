@@ -296,11 +296,13 @@ interface ModeConfig {
   tooltip: string;
 }
 
+const ACCENT = "#FF4757";
+
 const MODES: ModeConfig[] = [
-  { id: "confident",   label: "Confident",   color: "#3b82f6", description: "Posture · head stability",  tooltip: "Head stability, shoulder level, chin position" },
-  { id: "friendly",    label: "Friendly",    color: "#10b981", description: "Smile · eye contact",       tooltip: "Smile lift, eyebrow raise, head tilt" },
-  { id: "charismatic", label: "Charismatic", color: "#8b5cf6", description: "Expression range",          tooltip: "Expressiveness variance, head nods, eye openness" },
-  { id: "open",        label: "Open",        color: "#f59e0b", description: "Body position",             tooltip: "Shoulder width, facing forward, chin angle" },
+  { id: "confident",   label: "Confident",   color: ACCENT, description: "Posture · stability",   tooltip: "Head stability, shoulder level, chin position" },
+  { id: "friendly",    label: "Friendly",    color: ACCENT, description: "Smile · eye contact",   tooltip: "Smile lift, eyebrow raise, head tilt" },
+  { id: "charismatic", label: "Charismatic", color: ACCENT, description: "Expression range",      tooltip: "Expressiveness variance, head nods, eye openness" },
+  { id: "open",        label: "Open",        color: ACCENT, description: "Body position",         tooltip: "Shoulder width, facing forward, chin angle" },
 ];
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -314,13 +316,13 @@ function ModeTooltip({ text, children }: { text: string; children: React.ReactNo
         style={{ transition: "opacity 0.15s ease", whiteSpace: "nowrap" }}
       >
         <div
-          className="px-2.5 py-1.5 rounded-lg text-xs"
-          style={{ background: "var(--bg-elevated)", border: "1px solid var(--border-strong)", color: "var(--text-secondary)" }}
+          className="px-2.5 py-1.5 rounded-lg text-[10px] font-mono tracking-wide"
+          style={{ background: "#111111", border: "1px solid #2A2A2A", color: "#888888" }}
         >
           {text}
         </div>
         <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px"
-          style={{ width: 0, height: 0, borderLeft: "5px solid transparent", borderRight: "5px solid transparent", borderTop: "5px solid var(--border-strong)" }} />
+          style={{ width: 0, height: 0, borderLeft: "5px solid transparent", borderRight: "5px solid transparent", borderTop: "5px solid #2A2A2A" }} />
       </div>
     </div>
   );
@@ -328,17 +330,17 @@ function ModeTooltip({ text, children }: { text: string; children: React.ReactNo
 
 function CornerBrackets() {
   const corners: React.CSSProperties[] = [
-    { top: 16, left: 16, transform: "rotate(0deg)" },
-    { top: 16, right: 16, transform: "rotate(90deg)" },
-    { bottom: 16, right: 16, transform: "rotate(180deg)" },
-    { bottom: 16, left: 16, transform: "rotate(270deg)" },
+    { top: 14, left: 14, transform: "rotate(0deg)" },
+    { top: 14, right: 14, transform: "rotate(90deg)" },
+    { bottom: 14, right: 14, transform: "rotate(180deg)" },
+    { bottom: 14, left: 14, transform: "rotate(270deg)" },
   ];
   return (
     <>
       {corners.map((s, i) => (
         <div key={i} className="absolute pointer-events-none z-10" style={s}>
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <path d="M2 7V2H7" stroke="var(--border-strong)" strokeWidth="1.5" strokeLinecap="round" />
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M2 6V2H6" stroke="#2A2A2A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </div>
       ))}
@@ -348,39 +350,58 @@ function CornerBrackets() {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-2">
-      <span className="text-xs font-mono tracking-widest uppercase shrink-0" style={{ color: "var(--text-muted)" }}>
+    <div className="flex items-center gap-3 mb-4">
+      <span className="text-[10px] font-mono tracking-widest uppercase shrink-0" style={{ color: "#888888" }}>
         {children}
       </span>
-      <div className="flex-1 h-px" style={{ background: "var(--border-subtle)" }} />
+      <div className="flex-1 h-px" style={{ background: "#1A1A1A" }} />
     </div>
   );
 }
 
-function ScoreRing({ score, color }: { score: number; color: string }) {
-  const r    = 42;
+function ScoreRing({ score, hasData }: { score: number; hasData: boolean }) {
+  const r    = 62;
   const circ = 2 * Math.PI * r;
   const pct  = Math.round(score * 100);
+  const filled = circ * Math.min(score, 1);
   return (
-    <div className="flex flex-col items-center gap-1">
-      <div className="relative w-[108px] h-[108px]">
-        <svg className="w-full h-full" style={{ transform: "rotate(-90deg)" }} viewBox="0 0 100 100">
-          <circle cx="50" cy="50" r={r} fill="none" stroke="var(--bg-elevated)" strokeWidth="8" />
-          <circle
-            cx="50" cy="50" r={r}
-            fill="none"
-            stroke={color}
-            strokeWidth="8"
-            strokeLinecap="round"
-            strokeDasharray={`${circ * score} ${circ}`}
-            style={{ transition: "stroke-dasharray 0.3s ease, stroke 0.3s ease" }}
-          />
+    <div className="flex flex-col items-center">
+      <div className="relative" style={{ width: 160, height: 160 }}>
+        <svg
+          width="160" height="160" viewBox="0 0 160 160"
+          style={{ transform: "rotate(-90deg)" }}
+        >
+          {/* Track */}
+          <circle cx="80" cy="80" r={r} fill="none" stroke="#1A1A1A" strokeWidth="11" />
+          {/* Fill */}
+          {hasData && (
+            <circle
+              cx="80" cy="80" r={r}
+              fill="none"
+              stroke={ACCENT}
+              strokeWidth="11"
+              strokeLinecap="round"
+              strokeDasharray={`${filled} ${circ - filled}`}
+              style={{
+                transition: "stroke-dasharray 0.35s ease",
+                filter: "drop-shadow(0 0 7px rgba(255,71,87,0.5))",
+              }}
+            />
+          )}
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-3xl font-bold tabular-nums leading-none" style={{ color }}>
-            {pct}
+          <span
+            className="tabular-nums leading-none font-black"
+            style={{ fontSize: 54, color: hasData ? "#FFFFFF" : "#2A2A2A", letterSpacing: "-3px" }}
+          >
+            {hasData ? pct : "—"}
           </span>
-          <span className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>/ 100</span>
+          <span
+            className="font-mono tracking-widest uppercase"
+            style={{ fontSize: 9, color: "#888888", marginTop: 4 }}
+          >
+            Score
+          </span>
         </div>
       </div>
     </div>
@@ -388,39 +409,39 @@ function ScoreRing({ score, color }: { score: number; color: string }) {
 }
 
 function SignalRow({ label, score, passing }: Signal) {
-  const pct   = Math.round(score * 100);
-  const color = passing ? "var(--green)" : "var(--red)";
+  const pct = Math.round(score * 100);
   return (
-    <div className="flex items-start gap-2">
-      <span className="text-xs w-3 shrink-0 mt-0.5 font-mono" style={{ color }}>
-        {passing ? "✓" : "✗"}
-      </span>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-xs" style={{ color: "var(--text-secondary)" }}>{label}</span>
-          <span className="text-xs font-mono tabular-nums ml-2" style={{ color: "var(--text-muted)" }}>
-            {pct}%
-          </span>
-        </div>
-        <div className="h-0.5 rounded-full overflow-hidden" style={{ background: "var(--border-subtle)" }}>
-          <div
-            className="h-full rounded-full"
-            style={{ width: `${pct}%`, background: color, transition: "width 0.3s ease" }}
-          />
-        </div>
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center justify-between">
+        <span
+          className="text-[10px] font-mono tracking-widest uppercase"
+          style={{ color: "#888888" }}
+        >
+          {label}
+        </span>
+        <span
+          className="text-xs font-mono font-bold tabular-nums"
+          style={{ color: passing ? "#FFFFFF" : ACCENT }}
+        >
+          {pct}
+        </span>
+      </div>
+      <div
+        className="w-full rounded-full overflow-hidden"
+        style={{ height: 3, background: "#1A1A1A" }}
+      >
+        <div
+          className="h-full rounded-full"
+          style={{
+            width: `${pct}%`,
+            background: passing ? "#FFFFFF" : ACCENT,
+            transition: "width 0.3s ease",
+            boxShadow: passing ? "none" : `0 0 4px rgba(255,71,87,0.4)`,
+          }}
+        />
       </div>
     </div>
   );
-}
-
-function StatusDot() {
-  return (
-    <span className="w-1 h-1 rounded-full shrink-0 inline-block" style={{ background: "var(--green)" }} />
-  );
-}
-
-function Sep() {
-  return <span style={{ color: "var(--border-default)" }}>·</span>;
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
@@ -623,10 +644,10 @@ export default function LiveTracker() {
   const passingCount = signals.filter(s => s.passing).length;
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="flex h-full overflow-hidden" style={{ background: "#000000" }}>
 
       {/* ── Camera panel ─────────────────────────────────────────────────── */}
-      <div className="flex-1 min-w-0 flex flex-col" style={{ background: "var(--bg-app)" }}>
+      <div className="flex-1 min-w-0 flex flex-col" style={{ background: "#000000" }}>
         <div className="flex-1 relative overflow-hidden">
           <FaceMeshCamera
             confidenceScore={score}
@@ -638,32 +659,35 @@ export default function LiveTracker() {
           {/* ── Calibration overlay ── */}
           {calibState === "calibrating" && (
             <div
-              className="absolute bottom-0 inset-x-0 z-20 px-5 pb-5 pt-10"
-              style={{ background: "linear-gradient(to top, rgba(5,7,9,0.94) 0%, rgba(5,7,9,0.55) 65%, transparent 100%)" }}
+              className="absolute bottom-0 inset-x-0 z-20 px-6 pb-6 pt-12"
+              style={{ background: "linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.5) 70%, transparent 100%)" }}
             >
-              <div className="flex flex-col gap-2 max-w-xs mx-auto">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-col gap-3 max-w-xs">
+                <div className="flex items-center gap-2.5">
                   <span
                     className="w-1.5 h-1.5 rounded-full animate-pulse shrink-0"
-                    style={{ background: "var(--blue)" }}
+                    style={{ background: ACCENT, boxShadow: `0 0 5px ${ACCENT}` }}
                   />
-                  <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-                    Sit naturally and look at the camera.
+                  <span className="text-sm font-semibold tracking-tight" style={{ color: "#FFFFFF" }}>
+                    Sit naturally — look at the camera
                   </span>
                 </div>
-                <span className="text-xs" style={{ color: "var(--text-muted)", paddingLeft: "14px" }}>
-                  Calibrating to your face…
+                <span
+                  className="text-[10px] font-mono tracking-widest uppercase"
+                  style={{ color: "#888888", paddingLeft: "16px" }}
+                >
+                  Calibrating to your face
                 </span>
-                {/* 3-second fill bar — only visible once stable state is detected */}
                 <div
-                  className="h-px rounded-full overflow-hidden mt-1"
-                  style={{ background: "var(--bg-elevated)" }}
+                  className="rounded-full overflow-hidden"
+                  style={{ height: 2, background: "#1A1A1A", marginLeft: "16px" }}
                 >
                   <div
                     className="h-full rounded-full"
                     style={{
                       width: `${calibProgress * 100}%`,
-                      background: "var(--blue)",
+                      background: ACCENT,
+                      boxShadow: `0 0 6px rgba(255,71,87,0.5)`,
                       transition: calibProgress > 0 ? "width 0.25s linear" : "none",
                     }}
                   />
@@ -672,58 +696,58 @@ export default function LiveTracker() {
             </div>
           )}
 
-          {/* ── Toast notification ── */}
+          {/* ── Toast ── */}
           {toast && (
             <div
-              className="absolute top-3 left-1/2 z-30 flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap"
+              className="absolute top-3 left-1/2 z-30 flex items-center gap-2 px-3 py-1.5 rounded-md whitespace-nowrap"
               style={{
-                background: "rgba(16,185,129,0.13)",
-                border: "1px solid rgba(16,185,129,0.28)",
-                color: "var(--green)",
+                background: "rgba(0,0,0,0.85)",
+                border: "1px solid #2A2A2A",
                 backdropFilter: "blur(8px)",
                 animation: "hsosToastFade 2.2s ease forwards",
               }}
             >
-              <span className="w-1 h-1 rounded-full shrink-0" style={{ background: "var(--green)" }} />
-              {toast}
+              <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: ACCENT, boxShadow: `0 0 4px ${ACCENT}` }} />
+              <span className="text-[10px] font-mono tracking-widest uppercase" style={{ color: "#BBBBBB" }}>{toast}</span>
             </div>
           )}
         </div>
 
         {/* Status bar */}
         <div
-          className="flex items-center gap-3 px-4 shrink-0 text-xs font-mono"
+          className="flex items-center gap-3 px-5 shrink-0"
           style={{
-            height: 32,
-            background: "var(--bg-panel)",
-            borderTop: "1px solid var(--border-subtle)",
-            color: "var(--text-muted)",
+            height: 34,
+            background: "#000000",
+            borderTop: "1px solid #1A1A1A",
           }}
         >
-          <StatusDot /><span>Face tracking</span>
-          <Sep />
-          <StatusDot /><span>Body tracking</span>
+          <span
+            className="w-1.5 h-1.5 rounded-full shrink-0"
+            style={{ background: ACCENT, boxShadow: `0 0 4px rgba(255,71,87,0.6)` }}
+          />
+          <span className="text-[10px] font-mono tracking-widest uppercase" style={{ color: "#888888" }}>Live</span>
           <div className="flex-1" />
-          <span style={{ color: signals.length ? "var(--text-secondary)" : "var(--text-muted)" }}>
+          <span className="text-[10px] font-mono tracking-widest uppercase" style={{ color: signals.length ? "#BBBBBB" : "#444444" }}>
             {signals.length
-              ? `${passingCount}/${signals.length} signals passing`
-              : "awaiting face…"}
+              ? `${passingCount} of ${signals.length} passing`
+              : "Awaiting detection"}
           </span>
-          <Sep />
-          {/* Recalibrate button — always accessible */}
+          <span style={{ color: "#2A2A2A" }}>·</span>
           <button
             onClick={resetCalibration}
-            className="font-mono transition-colors"
+            className="text-[10px] font-mono tracking-widest uppercase transition-colors"
             style={{
-              color: calibState === "calibrating" ? "var(--blue)" : "var(--text-muted)",
+              color: calibState === "calibrating" ? ACCENT : "#444444",
               background: "none",
               border: "none",
               cursor: "pointer",
-              padding: "2px 4px",
-              fontSize: "inherit",
+              padding: "2px 0",
             }}
+            onMouseEnter={e => (e.currentTarget.style.color = "#FFFFFF")}
+            onMouseLeave={e => (e.currentTarget.style.color = calibState === "calibrating" ? ACCENT : "#444444")}
           >
-            {calibState === "calibrating" ? "Calibrating…" : "Recalibrate"}
+            {calibState === "calibrating" ? "Calibrating" : "Recalibrate"}
           </button>
         </div>
       </div>
@@ -733,44 +757,45 @@ export default function LiveTracker() {
         className="flex flex-col overflow-y-auto shrink-0"
         style={{
           width: 296,
-          background: "var(--bg-panel)",
-          borderLeft: "1px solid var(--border-subtle)",
+          background: "#000000",
+          borderLeft: "1px solid #1A1A1A",
         }}
       >
-        <div className="flex flex-col gap-5 p-5">
+        <div className="flex flex-col gap-7 p-5">
 
           {/* Mode selector */}
           <div>
-            <SectionLabel>Analysis Mode</SectionLabel>
-            <div className="grid grid-cols-2 gap-1.5 mt-3">
+            <SectionLabel>Mode</SectionLabel>
+            <div className="grid grid-cols-2 gap-1.5">
               {MODES.map(m => {
                 const active = mode === m.id;
                 return (
                   <ModeTooltip key={m.id} text={m.tooltip}>
                     <button
                       onClick={() => handleModeChange(m.id)}
-                      className="w-full flex flex-col items-start gap-0.5 px-3 py-2.5 rounded-lg text-left"
+                      className="w-full flex flex-col items-start gap-1 px-3 py-3 rounded-lg text-left transition-all"
                       style={{
-                        background: active ? `${m.color}12` : "var(--bg-elevated)",
-                        border:     `1px solid ${active ? `${m.color}40` : "var(--border-subtle)"}`,
-                        transition: "all 0.15s",
+                        background: active ? "rgba(255,71,87,0.08)" : "#111111",
+                        border: `1px solid ${active ? ACCENT : "#2A2A2A"}`,
                       }}
                     >
-                      <span className="text-sm font-medium leading-none" style={{ color: active ? m.color : "var(--text-secondary)" }}>
+                      <span
+                        className="text-xs font-semibold leading-none tracking-tight"
+                        style={{ color: active ? "#FFFFFF" : "#888888" }}
+                      >
                         {m.label}
                       </span>
-                      <span className="text-xs leading-none mt-1" style={{ color: "var(--text-muted)" }}>
+                      <span className="text-[10px] leading-none" style={{ color: "#444444" }}>
                         {m.description}
                       </span>
                       {active && signals.length > 0 && (
-                        <div className="flex gap-1 mt-1.5">
+                        <div className="flex gap-1 mt-1.5 w-full">
                           {signals.map(s => (
                             <div
                               key={s.label}
-                              className="w-1.5 h-1.5 rounded-full"
-                              title={`${s.label}: ${s.passing ? "passing" : "failing"}`}
+                              className="h-0.5 flex-1 rounded-full"
                               style={{
-                                background: s.passing ? "#10b981" : "#f43f5e",
+                                background: s.passing ? "#FFFFFF" : ACCENT,
                                 transition: "background 0.4s ease",
                               }}
                             />
@@ -787,66 +812,56 @@ export default function LiveTracker() {
           {/* Score ring */}
           <div>
             <SectionLabel>Signal Score</SectionLabel>
-            <div className="flex justify-center mt-3">
-              {signals.length > 0 ? (
-                <ScoreRing score={score} color={current.color} />
-              ) : (
-                <div
-                  className="flex flex-col items-center justify-center rounded-full"
-                  style={{ width: 108, height: 108, border: "4px solid var(--border-subtle)" }}
-                >
-                  <span className="text-3xl font-bold" style={{ color: "var(--text-muted)" }}>—</span>
-                  <span className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>/ 100</span>
-                </div>
-              )}
+            <div className="flex justify-center">
+              <ScoreRing score={score} hasData={signals.length > 0} />
             </div>
           </div>
 
-          {/* Calibration progress indicator in sidebar */}
+          {/* Calibration progress indicator */}
           {calibState === "calibrating" && (
             <div
-              className="flex items-center gap-2 px-3 py-2 rounded-lg"
-              style={{ background: "var(--bg-elevated)", border: "1px solid var(--border-subtle)" }}
+              className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg"
+              style={{ background: "#111111", border: "1px solid #2A2A2A" }}
             >
               <span
                 className="w-1.5 h-1.5 rounded-full animate-pulse shrink-0"
-                style={{ background: "var(--blue)" }}
+                style={{ background: ACCENT }}
               />
-              <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              <span className="text-[10px] font-mono tracking-widest uppercase" style={{ color: "#888888" }}>
                 {calibProgress > 0
-                  ? `Hold still… ${Math.round(calibProgress * 100)}%`
-                  : "Calibrating…"}
+                  ? `Hold still · ${Math.round(calibProgress * 100)}%`
+                  : "Calibrating"}
               </span>
             </div>
           )}
 
           {/* Signal breakdown */}
           <div>
-            <SectionLabel>Signal Breakdown</SectionLabel>
-            <div className="flex flex-col gap-3 mt-3">
+            <SectionLabel>Signals</SectionLabel>
+            <div className="flex flex-col gap-4">
               {signals.length > 0 ? (
                 signals.map(s => <SignalRow key={s.label} {...s} />)
               ) : (
                 <div
-                  className="flex items-center justify-center py-5 rounded-lg"
-                  style={{ background: "var(--bg-elevated)", border: "1px dashed var(--border-subtle)" }}
+                  className="flex items-center justify-center py-6 rounded-lg"
+                  style={{ background: "#111111", border: "1px solid #1A1A1A" }}
                 >
-                  <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                    Waiting for face detection…
+                  <span className="text-[10px] font-mono tracking-widest uppercase" style={{ color: "#444444" }}>
+                    Awaiting detection
                   </span>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Mode description */}
+          {/* What we measure */}
           <div>
-            <SectionLabel>What We Measure</SectionLabel>
+            <SectionLabel>Measuring</SectionLabel>
             <div
-              className="mt-3 rounded-lg px-3 py-3"
-              style={{ background: "var(--bg-elevated)", border: "1px solid var(--border-subtle)" }}
+              className="rounded-lg px-3 py-3"
+              style={{ background: "#111111", border: "1px solid #1A1A1A" }}
             >
-              <ModeDescription mode={mode} color={current.color} />
+              <ModeDescription mode={mode} />
             </div>
           </div>
 
@@ -856,7 +871,7 @@ export default function LiveTracker() {
   );
 }
 
-function ModeDescription({ mode, color }: { mode: Mode; color: string }) {
+function ModeDescription({ mode }: { mode: Mode }) {
   const descriptions: Record<Mode, { bullets: string[] }> = {
     confident: {
       bullets: [
@@ -888,10 +903,10 @@ function ModeDescription({ mode, color }: { mode: Mode; color: string }) {
     },
   };
   return (
-    <ul className="flex flex-col gap-1.5">
+    <ul className="flex flex-col gap-2">
       {descriptions[mode].bullets.map((b, i) => (
-        <li key={i} className="flex items-start gap-2 text-xs" style={{ color: "var(--text-muted)" }}>
-          <span style={{ color, marginTop: 1 }}>›</span>
+        <li key={i} className="flex items-start gap-2 text-[11px] leading-relaxed" style={{ color: "#888888" }}>
+          <span style={{ color: ACCENT, marginTop: 1, flexShrink: 0 }}>›</span>
           {b}
         </li>
       ))}

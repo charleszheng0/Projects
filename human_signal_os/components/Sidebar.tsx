@@ -102,7 +102,7 @@ export default function Sidebar({
       {/* Header */}
       <div>
         <p className="text-xs font-mono tracking-widest uppercase mb-1" style={{ color: "#4a4f5e" }}>
-          HumanSignal OS
+          Inflect
         </p>
         <h1 className="text-base font-semibold tracking-tight" style={{ color: "#e8eaf0" }}>
           Face Analytics

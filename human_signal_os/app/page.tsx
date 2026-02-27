@@ -61,14 +61,14 @@ export default function Home() {
           </div>
           <div>
             <div
-              className="text-sm font-semibold leading-none"
-              style={{ color: "var(--text-primary)", letterSpacing: "-0.01em" }}
+              className="text-base font-bold leading-none tracking-tight"
+              style={{ color: "var(--text-primary)" }}
             >
-              Human Signal OS
+              Inflect
             </div>
             <div
-              className="text-xs leading-none mt-0.5"
-              style={{ color: "var(--text-muted)" }}
+              className="text-xs leading-none mt-1"
+              style={{ color: "var(--text-secondary)" }}
             >
               Know how you sound before they do.
             </div>
@@ -77,7 +77,7 @@ export default function Home() {
 
         {/* Tab nav */}
         <nav
-          className="flex items-center gap-0.5 p-0.5 rounded-lg"
+          className="flex items-center gap-1 p-1 rounded-xl"
           style={{
             background: "var(--bg-elevated)",
             border: "1px solid var(--border-subtle)",
@@ -175,11 +175,12 @@ function TabBtn({
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-xs font-medium transition-all"
+      className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all"
       style={{
-        background: active ? "var(--bg-hover)" : "transparent",
-        color: active ? "var(--text-primary)" : "var(--text-muted)",
-        border: active ? "1px solid var(--border-default)" : "1px solid transparent",
+        background: active ? "var(--blue)" : "transparent",
+        color: active ? "white" : "var(--text-secondary)",
+        border: active ? "none" : "1px solid transparent",
+        boxShadow: active ? "0 2px 8px rgba(59,130,246,0.25)" : "none",
       }}
     >
       {children}
