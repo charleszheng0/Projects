@@ -352,7 +352,7 @@ export default function LiveTracker({ insight, onVisionScores }: LiveTrackerProp
         }}>
           {(["contour", "dots", "skeleton", "none"] as OverlayMode[]).map(om => {
             const labels: Record<OverlayMode, string> = {
-              contour: "Contour", dots: "Dots", skeleton: "Pose", none: "Off",
+              contour: "Contour", dots: "Dots", skeleton: "Pose", ghost: "Ghost", none: "Off",
             };
             const active = overlayMode === om;
             return (

@@ -162,7 +162,7 @@ export function averageVideoBreakdown(frames: VideoFrame[]): {
 
   const avgBreakdown = Object.fromEntries(
     keys.map(k => [k, frames.reduce((sum, f) => sum + f.breakdown[k], 0) / frames.length])
-  ) as VisionBreakdown;
+  ) as unknown as VisionBreakdown;
 
   const avgConfidence   = frames.reduce((s, f) => s + f.confidence,   0) / frames.length;
   const avgFriendliness = frames.reduce((s, f) => s + f.friendliness, 0) / frames.length;

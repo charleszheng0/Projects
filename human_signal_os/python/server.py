@@ -54,13 +54,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+_raw_origins = os.environ.get(
+    "CORS_ALLOW_ORIGINS",
+    "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001",
+)
+_cors_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:3001",
-    ],
+    allow_origins=_cors_origins,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
@@ -202,10 +204,11 @@ def _whisper_loaded() -> bool:
 # ── Entrypoint ─────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8000))
     uvicorn.run(
         "server:app",
         host="0.0.0.0",
-        port=8000,
+        port=port,
         reload=False,
         log_level="info",
     )

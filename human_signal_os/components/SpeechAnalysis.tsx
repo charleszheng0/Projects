@@ -14,7 +14,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { RollingBuffer } from "@/lib/rollingAverage";
 
 const FONT         = "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-const PYTHON_URL   = "http://localhost:8000";
+const PYTHON_URL   = (process.env.NEXT_PUBLIC_PYTHON_URL ?? "http://localhost:8000").replace(/\/$/, "");
 const CHUNK_MS     = 3000;  // 3-second audio chunks
 
 // ── Types ─────────────────────────────────────────────────────────────────────

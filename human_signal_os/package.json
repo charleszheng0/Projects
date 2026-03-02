@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently --kill-others-on-fail --names \"next,python\" --prefix-colors \"cyan,yellow\" \"next dev\" \"pip3 install -q -r python/requirements.txt && python3 python/server.py\"",
+    "dev": "next dev",
+    "dev:full": "concurrently --kill-others-on-fail --names \"next,python\" --prefix-colors \"cyan,yellow\" \"next dev\" \"pip3 install -q -r python/requirements.txt && python3 python/server.py\"",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"

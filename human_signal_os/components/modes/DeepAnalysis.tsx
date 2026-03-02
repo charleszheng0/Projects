@@ -15,7 +15,7 @@ import type { VisionBreakdown } from "@/lib/visionScoring";
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const FONT       = "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-const PYTHON_URL = "http://localhost:8000";
+const PYTHON_URL = (process.env.NEXT_PUBLIC_PYTHON_URL ?? "http://localhost:8000").replace(/\/$/, "");
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -52,20 +52,21 @@ interface TimestampEvent {
   severity: "high" | "medium" | "low";
 }
 
-type PipelineStage = "idle" | "uploading" | "speech" | "vision" | "report" | "done" | "error";
+type PipelineStage = "idle" | "connecting" | "uploading" | "speech" | "vision" | "report" | "done" | "error";
 
 const STAGE_LABELS: Record<PipelineStage, string> = {
-  idle:      "",
-  uploading: "Extracting audio",
-  speech:    "Analyzing speech",
-  vision:    "Reading facial expressions",
-  report:    "Generating report",
-  done:      "Done",
-  error:     "Error",
+  idle:       "",
+  connecting: "Waking up speech engine…",
+  uploading:  "Extracting audio",
+  speech:     "Analyzing speech",
+  vision:     "Reading facial expressions",
+  report:     "Generating report",
+  done:       "Done",
+  error:      "Error",
 };
 
 const STAGE_WEIGHTS: Record<PipelineStage, number> = {
-  idle: 0, uploading: 0.10, speech: 0.40, vision: 0.80, report: 1.0, done: 1.0, error: 0,
+  idle: 0, connecting: 0.05, uploading: 0.10, speech: 0.40, vision: 0.80, report: 1.0, done: 1.0, error: 0,
 };
 
 // ── Grade calculation ─────────────────────────────────────────────────────────
@@ -192,17 +193,18 @@ export default function DeepAnalysis() {
     const videoUrl = URL.createObjectURL(file);
 
     try {
-      // Stage 1: Upload to Python for speech analysis
-      setStage("uploading");
-
-      // Pre-flight: verify Python server is reachable
+      // Stage 1: Wake up speech engine (may take ~60s on cold start)
+      setStage("connecting");
       try {
-        await fetch(`${PYTHON_URL}/health`, { signal: AbortSignal.timeout(3_000) });
+        await fetch(`${PYTHON_URL}/health`, { signal: AbortSignal.timeout(90_000) });
       } catch {
         throw new Error(
-          "Python server is not running.\n\nStart it with:\n  cd python && python3 server.py"
+          "Speech engine is unreachable.\n\nIf running locally: cd python && python3 server.py\nIf deployed: check NEXT_PUBLIC_PYTHON_URL is set correctly."
         );
       }
+
+      // Stage 2: Upload to Python for speech analysis
+      setStage("uploading");
 
       const form = new FormData();
       form.append("video", file, file.name);
@@ -504,8 +506,8 @@ export default function DeepAnalysis() {
           </div>
           <ProgressBar stage={stage} visionPct={visionPct} />
           <div style={{ display: "flex", flexDirection: "column", gap: 6, width: "100%" }}>
-            {(["uploading", "speech", "vision", "report"] as PipelineStage[]).map((s, i) => {
-              const stageOrder = ["uploading", "speech", "vision", "report"];
+            {(["connecting", "uploading", "speech", "vision", "report"] as PipelineStage[]).map((s, i) => {
+              const stageOrder = ["connecting", "uploading", "speech", "vision", "report"];
               const currentIdx = stageOrder.indexOf(stage);
               const thisIdx    = stageOrder.indexOf(s);
               const done = thisIdx < currentIdx;

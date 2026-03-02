@@ -27,7 +27,7 @@ import { analyzeAudioChunkHume, type HumeEmotionResult } from "@/lib/humeApi";
 
 const FONT          = "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
 const ACCENT        = "#FF4D4D";
-const PYTHON_URL    = "http://localhost:8000";
+const PYTHON_URL    = (process.env.NEXT_PUBLIC_PYTHON_URL ?? "http://localhost:8000").replace(/\/$/, "");
 const CHUNK_MS      = 3000;
 const CALIB_MS      = 3500;
 const CALIB_NEEDED  = 30;
