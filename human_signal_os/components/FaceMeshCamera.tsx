@@ -23,38 +23,57 @@ export interface PoseLandmark {
   visibility?: number;
 }
 
+export type OverlayMode = "contour" | "dots" | "skeleton" | "ghost" | "none";
+
 export interface FaceMeshCameraProps {
-  confidenceScore: number; // 0–1  → dot color green (1) to red (0)
+  confidenceScore: number;
+  overlayMode?: OverlayMode;
   onFaceLandmarks?: (landmarks: FaceLandmark[]) => void;
   onPoseLandmarks?: (landmarks: PoseLandmark[]) => void;
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-function scoreToRgb(score: number): string {
-  const s = Math.max(0, Math.min(1, score));
-  return `rgb(${Math.round(255 * (1 - s))},${Math.round(255 * s)},0)`;
-}
-
-/**
- * Inject a <script> tag and resolve only after it fires `load`.
- * Idempotent — if the same src is already in the DOM, resolves immediately.
- */
 function loadScript(src: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    if (document.querySelector(`script[src="${src}"]`)) {
-      resolve();
-      return;
-    }
+    if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
     const el = document.createElement("script");
     el.src = src;
     el.crossOrigin = "anonymous";
-    el.onload = () => resolve();
+    el.onload  = () => resolve();
     el.onerror = () => reject(new Error(`CDN load failed: ${src}`));
     document.head.appendChild(el);
   });
 }
 
+// ── Ghost face contour paths (MediaPipe FaceMesh landmark sequences) ──────────
+
+// Face oval — jawline + forehead loop
+const FACE_OVAL: number[] = [
+  10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288,
+  397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136,
+  172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109, 10,
+];
+
+// Left eye contour
+const LEFT_EYE: number[] = [
+  33, 7, 163, 144, 145, 153, 154, 155, 133,
+  173, 157, 158, 159, 160, 161, 246, 33,
+];
+
+// Right eye contour
+const RIGHT_EYE: number[] = [
+  263, 249, 390, 373, 374, 380, 381, 382, 362,
+  398, 384, 385, 386, 387, 388, 466, 263,
+];
+
+// Lips outer + inner blend
+const LIPS: number[] = [
+  61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291,
+  375, 321, 405, 314, 17, 84, 181, 91, 146, 61,
+];
+
+// Pose skeleton connections
 const POSE_CONNECTIONS: [number, number][] = [
   [11, 12],
   [11, 13], [13, 15],
@@ -65,22 +84,45 @@ const POSE_CONNECTIONS: [number, number][] = [
   [24, 26], [26, 28],
 ];
 
+// ── Draw a continuous path through an ordered sequence of landmark indices ────
+function strokeContour(
+  ctx: CanvasRenderingContext2D,
+  seq: number[],
+  lm: FaceLandmark[],
+  dx: number,
+  dy: number,
+  dw: number,
+  dh: number,
+) {
+  if (seq.length < 2) return;
+  ctx.beginPath();
+  const first = lm[seq[0]];
+  if (!first) return;
+  ctx.moveTo(dx + first.x * dw, dy + first.y * dh);
+  for (let i = 1; i < seq.length; i++) {
+    const pt = lm[seq[i]];
+    if (pt) ctx.lineTo(dx + pt.x * dw, dy + pt.y * dh);
+  }
+  ctx.stroke();
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function FaceMeshCamera({
   confidenceScore,
+  overlayMode = "contour",
   onFaceLandmarks,
   onPoseLandmarks,
 }: FaceMeshCameraProps) {
   const videoRef      = useRef<HTMLVideoElement>(null);
   const canvasRef     = useRef<HTMLCanvasElement>(null);
   const confidenceRef = useRef(confidenceScore);
-  // Smoothed display score — EMA toward confidenceRef so color transitions are fluid
-  const displayScoreRef = useRef(confidenceScore);
+  const overlayRef    = useRef<OverlayMode>(overlayMode);
   const onFaceRef     = useRef(onFaceLandmarks);
   const onPoseRef     = useRef(onPoseLandmarks);
 
   useEffect(() => { confidenceRef.current = confidenceScore; }, [confidenceScore]);
+  useEffect(() => { overlayRef.current    = overlayMode; },     [overlayMode]);
   useEffect(() => { onFaceRef.current = onFaceLandmarks; },    [onFaceLandmarks]);
   useEffect(() => { onPoseRef.current = onPoseLandmarks; },    [onPoseLandmarks]);
 
@@ -113,7 +155,6 @@ export default function FaceMeshCamera({
       try { await video.play(); } catch { /* readyState check handles this */ }
 
       // ── 2. Load CDN scripts ───────────────────────────────────────────────
-      // drawing_utils first, then face_mesh + pose in parallel.
       const CDN = "https://cdn.jsdelivr.net/npm/@mediapipe";
       try {
         await loadScript(`${CDN}/drawing_utils/drawing_utils.js`);
@@ -132,8 +173,7 @@ export default function FaceMeshCamera({
 
       if (window.FaceMesh) {
         const fm = new window.FaceMesh({
-          locateFile: (f: string) =>
-            `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`,
+          locateFile: (f: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`,
         });
         fm.setOptions({
           maxNumFaces: 1,
@@ -146,14 +186,7 @@ export default function FaceMeshCamera({
           latestFace = r.multiFaceLandmarks?.[0] ?? undefined;
           if (latestFace) onFaceRef.current?.(latestFace);
         });
-
-        // KEY FIX: call initialize() to eagerly download all WASM binary assets
-        // before the first send(). Without this the emscripten Module object is
-        // not set up yet when the lazy-load triggers, causing:
-        //   "Cannot read properties of undefined (reading 'https://...assets.data')"
-        try {
-          await fm.initialize();
-        } catch (err) {
+        try { await fm.initialize(); } catch (err) {
           console.error("[FaceMeshCamera] FaceMesh.initialize() failed:", err);
         }
         if (stopped) return;
@@ -161,15 +194,12 @@ export default function FaceMeshCamera({
       }
 
       // ── 4. Init Pose ──────────────────────────────────────────────────────
-      // Sequential (not parallel) — avoids WASM memory contention between
-      // two large emscripten modules initialising simultaneously.
       let latestPose: PoseLandmark[] | undefined;
       let poseBusy = false;
 
       if (window.Pose) {
         const pose = new window.Pose({
-          locateFile: (f: string) =>
-            `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`,
+          locateFile: (f: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`,
         });
         pose.setOptions({
           modelComplexity: 1,
@@ -183,11 +213,7 @@ export default function FaceMeshCamera({
           latestPose = r.poseLandmarks ?? undefined;
           if (latestPose) onPoseRef.current?.(latestPose);
         });
-
-        // Same fix as FaceMesh — pre-warm before first send()
-        try {
-          await pose.initialize();
-        } catch (err) {
+        try { await pose.initialize(); } catch (err) {
           console.error("[FaceMeshCamera] Pose.initialize() failed:", err);
         }
         if (stopped) return;
@@ -211,51 +237,113 @@ export default function FaceMeshCamera({
         if (canvas!.width  !== w) canvas!.width  = w;
         if (canvas!.height !== h) canvas!.height = h;
 
-        // Video frame — un-mirrored; CSS scaleX(-1) on the element handles flip.
-        // Both pixels and landmark coords flip together → always aligned.
-        ctx!.drawImage(video!, 0, 0, w, h);
+        // Cover-fit: scale video to fill canvas while preserving aspect ratio
+        const vw = video!.videoWidth  || 1280;
+        const vh = video!.videoHeight || 720;
+        const scale = Math.max(w / vw, h / vh);
+        const dw = vw * scale;
+        const dh = vh * scale;
+        const dx = (w - dw) / 2;
+        const dy = (h - dh) / 2;
 
-        // Pose skeleton — barely-visible single white
-        if (latestPose?.length) {
-          ctx!.strokeStyle = "rgba(255,255,255,0.14)";
-          ctx!.lineWidth   = 1;
+        // Video frame — CSS scaleX(-1) mirrors for front-camera feel
+        ctx!.drawImage(video!, dx, dy, dw, dh);
+
+        const mode = overlayRef.current;
+
+        // "skeleton" or "contour" — draw pose bones
+        if ((mode === "skeleton" || mode === "contour") && latestPose?.length) {
+          ctx!.strokeStyle = "rgba(255,255,255,0.08)";
+          ctx!.lineWidth   = 0.8;
+          ctx!.lineCap     = "round";
           for (const [ai, bi] of POSE_CONNECTIONS) {
             const a = latestPose[ai], b = latestPose[bi];
             if (!a || !b) continue;
             if ((a.visibility ?? 1) < 0.5 || (b.visibility ?? 1) < 0.5) continue;
             ctx!.beginPath();
-            ctx!.moveTo(a.x * w, a.y * h);
-            ctx!.lineTo(b.x * w, b.y * h);
+            ctx!.moveTo(dx + a.x * dw, dy + a.y * dh);
+            ctx!.lineTo(dx + b.x * dw, dy + b.y * dh);
             ctx!.stroke();
           }
-          ctx!.fillStyle = "rgba(255,255,255,0.22)";
+        }
+
+        // "contour" — ghost face outline (default premium look)
+        if (mode === "contour" && latestFace?.length) {
+          ctx!.strokeStyle = "rgba(255,255,255,0.15)";
+          ctx!.lineWidth   = 0.8;
+          ctx!.lineCap     = "round";
+          ctx!.lineJoin    = "round";
+          strokeContour(ctx!, FACE_OVAL, latestFace, dx, dy, dw, dh);
+          strokeContour(ctx!, LEFT_EYE,  latestFace, dx, dy, dw, dh);
+          strokeContour(ctx!, RIGHT_EYE, latestFace, dx, dy, dw, dh);
+          strokeContour(ctx!, LIPS,      latestFace, dx, dy, dw, dh);
+        }
+
+        // "dots" — full 468-point landmark dot cloud
+        if (mode === "dots" && latestFace?.length) {
+          ctx!.fillStyle = "rgba(255,255,255,0.28)";
+          for (const lm of latestFace) {
+            ctx!.beginPath();
+            ctx!.arc(dx + lm.x * dw, dy + lm.y * dh, 1.2, 0, 2 * Math.PI);
+            ctx!.fill();
+          }
+          // Also show pose dots when in dots mode
+          if (latestPose?.length) {
+            ctx!.fillStyle = "rgba(255,255,255,0.35)";
+            for (const lm of latestPose) {
+              if ((lm.visibility ?? 1) < 0.5) continue;
+              ctx!.beginPath();
+              ctx!.arc(dx + lm.x * dw, dy + lm.y * dh, 2.5, 0, 2 * Math.PI);
+              ctx!.fill();
+            }
+            ctx!.strokeStyle = "rgba(255,255,255,0.18)";
+            ctx!.lineWidth   = 1;
+            for (const [ai, bi] of POSE_CONNECTIONS) {
+              const a = latestPose[ai], b = latestPose[bi];
+              if (!a || !b) continue;
+              if ((a.visibility ?? 1) < 0.5 || (b.visibility ?? 1) < 0.5) continue;
+              ctx!.beginPath();
+              ctx!.moveTo(dx + a.x * dw, dy + a.y * dh);
+              ctx!.lineTo(dx + b.x * dw, dy + b.y * dh);
+              ctx!.stroke();
+            }
+          }
+        }
+
+        // "skeleton" — pose bones only, no face overlay
+        if (mode === "skeleton" && latestPose?.length) {
+          ctx!.fillStyle = "rgba(255,255,255,0.25)";
           for (const lm of latestPose) {
             if ((lm.visibility ?? 1) < 0.5) continue;
             ctx!.beginPath();
-            ctx!.arc(lm.x * w, lm.y * h, 2.5, 0, 2 * Math.PI);
+            ctx!.arc(dx + lm.x * dw, dy + lm.y * dh, 2.5, 0, 2 * Math.PI);
             ctx!.fill();
           }
         }
 
-        // Face mesh contour — unobtrusive white at 25% opacity
-        if (latestFace?.length) {
-          ctx!.fillStyle = "rgba(255,255,255,0.25)";
-          for (const lm of latestFace) {
-            ctx!.beginPath();
-            ctx!.arc(lm.x * w, lm.y * h, 1.0, 0, 2 * Math.PI);
-            ctx!.fill();
-          }
+        // "ghost" — ultra-faint face outline at 15% opacity for Visual mode (no dots, no pose)
+        if (mode === "ghost" && latestFace?.length) {
+          ctx!.globalAlpha = 0.15;
+          ctx!.strokeStyle = "rgba(255,255,255,1)";
+          ctx!.lineWidth   = 0.9;
+          ctx!.lineCap     = "round";
+          ctx!.lineJoin    = "round";
+          strokeContour(ctx!, FACE_OVAL, latestFace, dx, dy, dw, dh);
+          strokeContour(ctx!, LEFT_EYE,  latestFace, dx, dy, dw, dh);
+          strokeContour(ctx!, RIGHT_EYE, latestFace, dx, dy, dw, dh);
+          strokeContour(ctx!, LIPS,      latestFace, dx, dy, dw, dh);
+          ctx!.globalAlpha = 1;
         }
 
-        // Feed FaceMesh (throttled — skip frame if previous still processing)
+        // "none" — plain camera, nothing drawn over video
+
+        // Feed FaceMesh (throttled)
         if (faceMeshRef.current && !fmBusy) {
           fmBusy = true;
           try {
             faceMeshRef.current.send({ image: video })
               .catch(() => { fmBusy = false; });
-          } catch {
-            fmBusy = false;
-          }
+          } catch { fmBusy = false; }
         }
         // Feed Pose (independent throttle)
         if (poseRef.current && !poseBusy) {
@@ -263,9 +351,7 @@ export default function FaceMeshCamera({
           try {
             poseRef.current.send({ image: video })
               .catch(() => { poseBusy = false; });
-          } catch {
-            poseBusy = false;
-          }
+          } catch { poseBusy = false; }
         }
       }
 
@@ -288,29 +374,19 @@ export default function FaceMeshCamera({
   }, []);
 
   return (
-    <div className="relative w-full h-full" style={{ background: "#000000" }}>
-      {/* Hidden video — MUST be in DOM for browser to decode frames */}
+    <div style={{ position: "relative", width: "100%", height: "100%", background: "#000000" }}>
+      {/* Hidden video — must be in DOM for frame decoding */}
       <video
         ref={videoRef}
-        className="absolute opacity-0 pointer-events-none"
-        style={{ width: 1, height: 1, top: 0, left: 0 }}
+        style={{ position: "absolute", width: 1, height: 1, top: 0, left: 0, opacity: 0, pointerEvents: "none" }}
         playsInline
         muted
       />
-      {/* Canvas — CSS mirror so user sees front-camera view */}
+      {/* Canvas — CSS mirror for front-camera view */}
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 w-full h-full"
-        style={{ transform: "scaleX(-1)" }}
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", transform: "scaleX(-1)" }}
       />
-      {/* LIVE badge */}
-      <div
-        className="absolute top-3 left-3 flex items-center gap-2 px-2.5 py-1 rounded-md z-10"
-        style={{ background: "rgba(0,0,0,0.75)", border: "1px solid #2A2A2A", backdropFilter: "blur(6px)" }}
-      >
-        <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: "#FF4757", boxShadow: "0 0 5px rgba(255,71,87,0.7)" }} />
-        <span className="text-[10px] font-mono tracking-widest uppercase" style={{ color: "#888888" }}>Live</span>
-      </div>
     </div>
   );
 }

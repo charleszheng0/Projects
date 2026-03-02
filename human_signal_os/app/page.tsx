@@ -2,171 +2,115 @@
 
 import { useState } from "react";
 import dynamic from "next/dynamic";
-import SpeechAnalysis from "@/components/SpeechAnalysis";
 
-// LiveTracker contains the webcam — load only on client
-const LiveTracker = dynamic(() => import("@/components/LiveTracker"), {
-  ssr: false,
-  loading: () => (
-    <div className="flex h-full items-center justify-center">
-      <div className="flex flex-col items-center gap-3">
-        <div
-          className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
-          style={{ borderColor: "var(--border-default)", borderTopColor: "var(--blue)" }}
-        />
-        <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
-          Loading…
-        </span>
-      </div>
+function ModeLoadingSpinner() {
+  return (
+    <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{
+        width: 24, height: 24, borderRadius: "50%",
+        border: "2px solid rgba(255,255,255,0.1)",
+        borderTopColor: "#3B82F6",
+        animation: "spin 0.8s linear infinite",
+      }} />
     </div>
-  ),
+  );
+}
+
+const LiveSession = dynamic(() => import("@/components/modes/LiveSession"), {
+  ssr: false,
+  loading: () => <ModeLoadingSpinner />,
 });
 
-type Tab = "live" | "speech";
+const VisualOnly = dynamic(() => import("@/components/modes/VisualOnly"), {
+  ssr: false,
+  loading: () => <ModeLoadingSpinner />,
+});
+
+const DeepAnalysis = dynamic(() => import("@/components/modes/DeepAnalysis"), {
+  ssr: false,
+  loading: () => <ModeLoadingSpinner />,
+});
+
+type Mode = "deep" | "live" | "visual";
+
+const FONT = "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
 
 export default function Home() {
-  const [tab, setTab] = useState<Tab>("live");
+  const [mode, setMode] = useState<Mode>("live");
 
   return (
-    <div
-      className="flex flex-col"
-      style={{ height: "100vh", background: "var(--bg-app)", overflow: "hidden" }}
-    >
-      {/* ── App header ───────────────────────────────────────────────────── */}
-      <header
-        className="flex items-center justify-between px-5 shrink-0"
-        style={{
-          height: 52,
-          background: "var(--bg-panel)",
-          borderBottom: "1px solid var(--border-subtle)",
-        }}
-      >
+    <div style={{
+      height: "100vh", display: "flex", flexDirection: "column",
+      background: "var(--bg-app)", overflow: "hidden", fontFamily: FONT,
+    }}>
+      {/* ── Header ──────────────────────────────────────────────────────── */}
+      <header style={{
+        height: 52, flexShrink: 0,
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "0 20px",
+        background: "var(--bg-panel)",
+        borderBottom: "1px solid var(--border-subtle)",
+      }}>
         {/* Brand */}
-        <div className="flex items-center gap-3">
-          <div
-            className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-            style={{
-              background: "linear-gradient(135deg, var(--blue) 0%, var(--purple) 100%)",
-            }}
-          >
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{
+            width: 28, height: 28, borderRadius: 6,
+            background: "#141414", border: "1px solid #242424",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <circle cx="7" cy="5" r="2.5" fill="white" />
-              <path
-                d="M2 12c0-2.76 2.24-5 5-5s5 2.24 5 5"
-                stroke="white"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
+              <circle cx="7" cy="4.5" r="2" fill="white" />
+              <path d="M5.5 7.5 L4 9 L4 13 L10 13 L10 9 L8.5 7.5 Z" fill="white" />
             </svg>
           </div>
           <div>
-            <div
-              className="text-base font-bold leading-none tracking-tight"
-              style={{ color: "var(--text-primary)" }}
-            >
+            <div style={{ color: "#FFFFFF", fontWeight: 600, fontSize: 15, letterSpacing: "-0.01em", lineHeight: 1 }}>
               Inflect
             </div>
-            <div
-              className="text-xs leading-none mt-1"
-              style={{ color: "var(--text-secondary)" }}
-            >
+            <div style={{ color: "#777777", fontWeight: 300, fontSize: 11, letterSpacing: "0.06em", marginTop: 3, lineHeight: 1 }}>
               Know how you sound before they do.
             </div>
           </div>
         </div>
 
-        {/* Tab nav */}
-        <nav
-          className="flex items-center gap-1 p-1 rounded-xl"
-          style={{
-            background: "var(--bg-elevated)",
-            border: "1px solid var(--border-subtle)",
-          }}
-        >
-          <TabBtn active={tab === "live"} onClick={() => setTab("live")}>
-            <svg
-              width="13"
-              height="13"
-              viewBox="0 0 13 13"
-              fill="none"
-              className="shrink-0"
-            >
-              <circle
-                cx="6.5"
-                cy="6.5"
-                r="5.5"
-                stroke="currentColor"
-                strokeWidth="1.3"
-              />
-              <circle cx="6.5" cy="6.5" r="2" fill="currentColor" />
-            </svg>
-            Live Tracker
-          </TabBtn>
-          <TabBtn active={tab === "speech"} onClick={() => setTab("speech")}>
-            <svg
-              width="13"
-              height="13"
-              viewBox="0 0 13 13"
-              fill="none"
-              className="shrink-0"
-            >
-              <path
-                d="M6.5 1.5a2 2 0 0 1 2 2v3.5a2 2 0 0 1-4 0V3.5a2 2 0 0 1 2-2z"
-                stroke="currentColor"
-                strokeWidth="1.3"
-              />
-              <path
-                d="M2.5 6.5a4 4 0 0 0 8 0"
-                stroke="currentColor"
-                strokeWidth="1.3"
-                strokeLinecap="round"
-              />
-              <path
-                d="M6.5 10.5v1.5"
-                stroke="currentColor"
-                strokeWidth="1.3"
-                strokeLinecap="round"
-              />
-            </svg>
-            Speech Analysis
-          </TabBtn>
+        {/* Mode tabs */}
+        <nav style={{
+          display: "flex", alignItems: "center", gap: 1,
+          padding: 4, borderRadius: 12,
+          background: "var(--bg-elevated)", border: "1px solid var(--border-subtle)",
+        }}>
+          <ModeBtn active={mode === "deep"} onClick={() => setMode("deep")}>
+            <DeepIcon /> Deep Analysis
+          </ModeBtn>
+          <ModeBtn active={mode === "live"} onClick={() => setMode("live")}>
+            <LiveIcon /> Live Session
+          </ModeBtn>
+          <ModeBtn active={mode === "visual"} onClick={() => setMode("visual")}>
+            <VisualIcon /> Visual
+          </ModeBtn>
         </nav>
 
-        {/* System status */}
-        <div className="flex items-center gap-2">
-          <span
-            className="w-1.5 h-1.5 rounded-full animate-pulse"
-            style={{ background: "var(--green)" }}
-          />
-          <span
-            className="text-xs font-mono tracking-widest"
-            style={{ color: "var(--text-muted)" }}
-          >
+        {/* Online indicator */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span className="animate-pulse" style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--green)" }} />
+          <span style={{ fontSize: 10, color: "var(--text-secondary)", letterSpacing: "0.1em", fontFamily: "monospace" }}>
             ONLINE
           </span>
         </div>
       </header>
 
-      {/* ── Tab content ──────────────────────────────────────────────────── */}
-      <main className="flex-1 min-h-0">
-        {/* Keep LiveTracker mounted but hidden so camera doesn't restart on tab switch */}
-        <div className="h-full" style={{ display: tab === "live" ? "block" : "none" }}>
-          <LiveTracker />
-        </div>
-        {tab === "speech" && (
-          <div className="h-full">
-            <SpeechAnalysis />
-          </div>
-        )}
+      {/* ── Mode content ────────────────────────────────────────────────── */}
+      <main style={{ flex: 1, minHeight: 0 }}>
+        {mode === "deep"   && <DeepAnalysis />}
+        {mode === "live"   && <LiveSession />}
+        {mode === "visual" && <VisualOnly />}
       </main>
     </div>
   );
 }
 
-function TabBtn({
-  active,
-  onClick,
-  children,
+function ModeBtn({
+  active, onClick, children,
 }: {
   active: boolean;
   onClick: () => void;
@@ -175,15 +119,45 @@ function TabBtn({
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all"
       style={{
-        background: active ? "var(--blue)" : "transparent",
-        color: active ? "white" : "var(--text-secondary)",
-        border: active ? "none" : "1px solid transparent",
-        boxShadow: active ? "0 2px 8px rgba(59,130,246,0.25)" : "none",
+        display: "flex", alignItems: "center", gap: 6,
+        padding: "7px 14px", borderRadius: 9,
+        fontSize: 12, fontWeight: 600, letterSpacing: "0.01em",
+        fontFamily: FONT,
+        background: active ? "#3B82F6" : "transparent",
+        color: active ? "#FFFFFF" : "#888888",
+        border: "none", cursor: "pointer",
+        transition: "all 0.15s ease",
       }}
     >
       {children}
     </button>
+  );
+}
+
+function DeepIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+      <rect x="1" y="2" width="10" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M4.5 4.5L8.5 6L4.5 7.5V4.5Z" fill="currentColor" />
+    </svg>
+  );
+}
+
+function LiveIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+      <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.3" />
+      <circle cx="6" cy="6" r="1.8" fill="currentColor" />
+    </svg>
+  );
+}
+
+function VisualIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+      <path d="M1 6C2.5 3 9.5 3 11 6C9.5 9 2.5 9 1 6Z" stroke="currentColor" strokeWidth="1.3" />
+      <circle cx="6" cy="6" r="1.5" fill="currentColor" />
+    </svg>
   );
 }
