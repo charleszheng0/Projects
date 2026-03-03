@@ -686,10 +686,7 @@ export default function LiveSession() {
                 </p>
               ) : (
                 <p style={{ fontFamily: FONT, fontSize: 10, color: "#666666", fontStyle: "italic", margin: 0 }}>
-                  {serverOnline === false
-                    ? "Speech engine unavailable — transcript offline"
-                    : recording ? "Speak — updates every 3 s…"
-                    : "Waiting for mic…"}
+                  {recording ? "Speak — updates every 3 s…" : "Waiting for mic…"}
                 </p>
               )}
             </div>

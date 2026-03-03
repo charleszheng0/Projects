@@ -198,9 +198,7 @@ export default function DeepAnalysis() {
       try {
         await fetch(`${PYTHON_URL}/health`, { signal: AbortSignal.timeout(90_000) });
       } catch {
-        throw new Error(
-          "Speech engine is unreachable.\n\nIf running locally: cd python && python3 server.py\nIf deployed: check NEXT_PUBLIC_PYTHON_URL is set correctly."
-        );
+        throw new Error("Speech engine is temporarily unavailable. Please try again in a moment.");
       }
 
       // Stage 2: Upload to Python for speech analysis
