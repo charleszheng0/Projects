@@ -175,7 +175,7 @@ export default function LiveSession() {
   const [friendliness, setFriendliness] = useState(0);
   const [breakdown,    setBreakdown]    = useState<VisionBreakdown | null>(null);
   const [hasVision,    setHasVision]    = useState(false);
-  const [overlayMode,  setOverlay]      = useState<OverlayMode>("contour");
+  const [overlayMode,  setOverlay]      = useState<OverlayMode>("none");
   const [calibState,   setCalibState]   = useState<"calibrating" | "done">("calibrating");
   const [calibProg,    setCalibProg]    = useState(0);
   const [toast,        setToast]        = useState<string | null>(null);
@@ -508,20 +508,22 @@ export default function LiveSession() {
         <div style={{
           position: "absolute", top: 14, right: 16, zIndex: 20,
           display: "flex", gap: 2,
-          background: "rgba(0,0,0,0.6)", backdropFilter: "blur(10px)",
+          background: "rgba(0,0,0,0.72)", backdropFilter: "blur(10px)",
           borderRadius: 10, padding: "4px",
+          border: "1px solid rgba(255,255,255,0.10)",
         }}>
-          {(["contour", "dots", "skeleton", "none"] as OverlayMode[]).map(om => {
-            const labels: Record<OverlayMode, string> = { contour: "Contour", dots: "Dots", skeleton: "Pose", ghost: "Ghost", none: "Off" };
+          {(["dots", "skeleton", "none"] as OverlayMode[]).map(om => {
+            const labels: Record<string, string> = { dots: "Dots", skeleton: "Pose", none: "Off" };
             const active = overlayMode === om;
             return (
               <button key={om} onClick={() => setOverlay(om)} style={{
                 fontFamily: FONT, fontSize: 10, letterSpacing: "0.06em",
                 textTransform: "uppercase", fontWeight: active ? 600 : 400,
-                color: active ? "#FFFFFF" : "#666666",
-                background: active ? "rgba(255,255,255,0.10)" : "transparent",
-                border: "none", borderRadius: 7, padding: "4px 10px",
+                color: active ? "#FFFFFF" : "#888888",
+                background: active ? "rgba(255,255,255,0.14)" : "transparent",
+                border: "none", borderRadius: 7, padding: "5px 12px",
                 cursor: "pointer",
+                transition: "background 0.15s ease, color 0.15s ease",
               }}>
                 {labels[om]}
               </button>

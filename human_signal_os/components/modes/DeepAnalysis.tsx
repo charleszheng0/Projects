@@ -217,6 +217,19 @@ export default function DeepAnalysis() {
 
   // ── Main pipeline ─────────────────────────────────────────────────────────
 
+  function fallbackSpeech(): DeepSpeechResult {
+    return {
+      speech_metrics: {
+        pitch_variance: 0, volume_trailing: 0, filler_density: 0,
+        speech_rate: 0, pause_quality: 0, upspeak: 0, vocal_fry: 0, composite: 0,
+      },
+      transcript: [],
+      pyaudio_emotion: "neutral",
+      hume: { confidence: 0, distress: 0, excitement: 0, calmness: 0 },
+      assemblyai: { sentences: [], chapters: [], fillerWords: [] },
+    };
+  }
+
   const runPipeline = useCallback(async (file: File) => {
     setReport(null);
     setErrorMsg(null);
@@ -226,39 +239,49 @@ export default function DeepAnalysis() {
     const videoUrl = URL.createObjectURL(file);
 
     try {
-      // Stage 1: Wake up speech engine (may take ~60s on cold start)
+      // Stage 1: Try to reach speech engine (non-blocking — vision runs regardless)
       setStage("connecting");
+      let speechAvailable = false;
       try {
-        await fetch(`${PYTHON_URL}/health`, { signal: AbortSignal.timeout(90_000) });
+        const r = await fetch(`${PYTHON_URL}/health`, { signal: AbortSignal.timeout(15_000) });
+        speechAvailable = r.ok;
       } catch {
-        throw new Error("Speech engine is temporarily unavailable. Please try again in a moment.");
+        // Server offline — will skip speech analysis and continue with vision only
       }
 
-      // Stage 2: Upload to Python for speech analysis
-      setStage("uploading");
+      // Stage 2: Upload to Python for speech analysis (if available)
+      let speechData: DeepSpeechResult;
+      if (speechAvailable) {
+        setStage("uploading");
+        const form = new FormData();
+        form.append("video", file, file.name);
+        try {
+          const speechRes = await fetch(`${PYTHON_URL}/deep-analyze`, {
+            method: "POST",
+            body: form,
+            signal: AbortSignal.timeout(600_000),
+          });
+          if (!speechRes.ok) throw new Error(`Server error ${speechRes.status}`);
+          speechData = await speechRes.json();
+        } catch (err) {
+          console.warn("[DeepAnalysis] speech analysis failed:", err);
+          speechData = fallbackSpeech();
+        }
+      } else {
+        speechData = fallbackSpeech();
+      }
 
-      const form = new FormData();
-      form.append("video", file, file.name);
-
-      const speechRes = await fetch(`${PYTHON_URL}/deep-analyze`, {
-        method: "POST",
-        body: form,
-        signal: AbortSignal.timeout(600_000),
-      });
-      if (!speechRes.ok) throw new Error(`Server error ${speechRes.status}: ${await speechRes.text()}`);
-      const speechData: DeepSpeechResult = await speechRes.json();
-
-      // Also run AssemblyAI on the audio (stub)
+      // AssemblyAI stub
       setStage("speech");
       const audioBlob = new Blob([file], { type: file.type });
       const assemblyResult = await analyzeAudioAssemblyAI(audioBlob);
 
-      // Stage 2: MediaPipe vision on video frames
+      // Stage 3: MediaPipe vision on video frames (always runs)
       setStage("vision");
       const visionFrames = await processVideoFrames(file, setVisionPct);
       const { avgBreakdown, avgConfidence, avgFriendliness } = averageVideoBreakdown(visionFrames);
 
-      // Stage 3: Assemble report
+      // Stage 4: Assemble report
       setStage("report");
       await new Promise(r => setTimeout(r, 400));
 
@@ -510,9 +533,6 @@ export default function DeepAnalysis() {
             </div>
           )}
 
-          <p style={{ fontFamily: FONT, fontSize: 11, color: "#555555", textAlign: "center", margin: 0 }}>
-            Requires Python server running at localhost:8000
-          </p>
         </div>
       </div>
     );
@@ -532,7 +552,7 @@ export default function DeepAnalysis() {
               Analyzing
             </h2>
             <p style={{ fontFamily: FONT, fontSize: 13, color: "#777777", margin: 0 }}>
-              This may take a minute. Whisper (large) is running locally.
+              Processing your video. This may take a moment.
             </p>
           </div>
           <ProgressBar stage={stage} visionPct={visionPct} />

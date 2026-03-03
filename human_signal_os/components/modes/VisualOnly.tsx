@@ -200,8 +200,12 @@ export default function VisualOnly() {
   // Callout system
   const [{ active: callouts }, dispatch] = useReducer(calloutReducer, { active: [], cooldowns: {} });
   const cooldownsRef  = useRef<Record<string, number>>({});
-  // Separate hysteresis counters — negative signals require 3 consecutive blocks, positive 2
+  // Separate hysteresis counters — negative signals require 4 consecutive blocks, positive 2
   const hysteresisRef = useRef<Record<string, number>>({});
+  // Per-metric EMA baseline (0–1 scale). Initialized on first reading, updated slowly.
+  // Used to ensure negative callouts only fire when a metric degrades vs the person's own session norm.
+  const metricEmaRef  = useRef<Partial<Record<string, number>>>({});
+  const EMA_ALPHA = 0.01; // ~100-evaluation time constant ≈ ~100s of session data
 
   useEffect(() => {
     const saved = loadVisionBaseline();
@@ -222,15 +226,15 @@ export default function VisualOnly() {
   const addCallout = useCallback((rule: CalloutRule, anchorX: number, anchorY: number) => {
     const now = Date.now();
     if (cooldownsRef.current[rule.text] && cooldownsRef.current[rule.text] > now) return;
-    if (callouts.length >= 2) return;
+    if (callouts.length >= 1) return;  // only 1 active at a time
 
     const id = `${rule.text}-${now}`;
     dispatch({ type: "ADD", callout: { id, text: rule.text, anchorX, anchorY, phase: "in" } });
-    cooldownsRef.current[rule.text] = now + 7000;  // 7s cooldown so same callout doesn't spam
+    cooldownsRef.current[rule.text] = now + 15000;  // 15s cooldown per callout type
 
     setTimeout(() => dispatch({ type: "PHASE", id, phase: "hold" }),  200);
-    setTimeout(() => dispatch({ type: "PHASE", id, phase: "out" }),   2200);
-    setTimeout(() => dispatch({ type: "REMOVE", id }),                 2700);
+    setTimeout(() => dispatch({ type: "PHASE", id, phase: "out" }),   2500);
+    setTimeout(() => dispatch({ type: "REMOVE", id }),                 3000);
   }, [callouts.length]);
 
   const handleFaceLandmarks = useCallback((landmarks: FaceLandmark[]) => {
@@ -318,20 +322,50 @@ export default function VisualOnly() {
     // ── Callout evaluation (every ~30 frames ≈ 1s at 30fps) ─────────────────
     if (frameCountRef.current % 30 !== 0) return;
 
+    // Update per-metric EMA baselines (only after calibration, so resting state is learned)
+    if (calibStateRef.current === "done") {
+      const metricVals: Record<string, number> = {
+        gaze:           bd.gaze,
+        browTension:    bd.browTension,
+        lipCompression: bd.lipCompression,
+        fidget:         bd.fidget,
+        headPosition:   bd.headPosition,
+        duchenneSmile:  bd.duchenneSmile,
+        microExpr:      bd.microExpr,
+        presence:       pres / 100,
+      };
+      for (const [k, v] of Object.entries(metricVals)) {
+        const prev = metricEmaRef.current[k];
+        metricEmaRef.current[k] = prev === undefined ? v : prev + EMA_ALPHA * (v - prev);
+      }
+    }
+
     for (const rule of CALLOUT_RULES) {
       const val = rule.key === "presence"
         ? pres
         : bd[rule.key as keyof VisionBreakdown] ?? 0;
 
-      // Negative callouts need 3 consecutive hits; positive only need 2
       const isPositive = rule.text.startsWith("Great") ||
                          rule.text.startsWith("Good")  ||
                          rule.text.startsWith("Strong") ||
                          rule.text.startsWith("Genuine") ||
                          rule.text.startsWith("Open");
-      const threshold = isPositive ? 2 : 3;
+      // Positive callouts: 2 consecutive hits. Negative: 4 (more sustained before firing).
+      const threshold = isPositive ? 2 : 4;
 
       if (rule.check(val)) {
+        // For negative callouts: only fire if the metric has deteriorated vs the person's session norm.
+        // This prevents firing when a low value is simply the user's natural resting state.
+        if (!isPositive) {
+          const normalVal = rule.key === "presence" ? pres / 100 : val;
+          const ema = metricEmaRef.current[rule.key as string];
+          // If EMA not established yet, or current value is not meaningfully below personal average, skip
+          if (ema === undefined || normalVal > ema - 0.12) {
+            hysteresisRef.current[rule.text] = 0;
+            continue;
+          }
+        }
+
         hysteresisRef.current[rule.text] = (hysteresisRef.current[rule.text] ?? 0) + 1;
         if (hysteresisRef.current[rule.text] >= threshold) {
           const mirroredX = 1 - rule.positionX;
@@ -355,6 +389,7 @@ export default function VisualOnly() {
     hist3sRef.current      = [];
     hist5sRef.current      = [];
     rollRef.current.clear();
+    metricEmaRef.current   = {};
     setCalibState("calibrating");
     setCalibProg(0);
     setHasData(false);
