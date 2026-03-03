@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { LineChart, Line, YAxis, ResponsiveContainer } from "recharts";
 import FaceMeshCamera from "@/components/FaceMeshCamera";
 import type { FaceLandmark, PoseLandmark, OverlayMode } from "@/components/FaceMeshCamera";
 import {
@@ -188,7 +187,10 @@ export default function LiveSession() {
   const [transcript,     setTranscript]      = useState("");
   const [speechCycles,   setSpeechCycles]    = useState(0);
   const [isAnalyzing,    setIsAnalyzing]     = useState(false);
-  const analyserRef = useRef<AnalyserNode | null>(null);
+  const [interimText,    setInterimText]     = useState("");
+  const analyserRef      = useRef<AnalyserNode | null>(null);
+  const recognitionRef   = useRef<any>(null);
+  const startSpeechRecRef = useRef<() => void>(() => {});
 
   // Hume + graph state
   const [emotion,       setEmotion]      = useState<HumeEmotionResult | null>(null);
@@ -354,6 +356,37 @@ export default function LiveSession() {
     setEmotion(result);
   }, []);
 
+  // ── Browser-native live transcript (SpeechRecognition) ──────────────────
+  const startSpeechRecognition = useCallback(() => {
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR || recognitionRef.current) return;
+    const rec = new SR();
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.lang = "en-US";
+    rec.onresult = (e: any) => {
+      let interim = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) {
+          const word = e.results[i][0].transcript.trim();
+          if (word) setTranscript(prev => prev ? prev + " " + word : word);
+        } else {
+          interim += e.results[i][0].transcript;
+        }
+      }
+      setInterimText(interim);
+    };
+    rec.onerror = () => { recognitionRef.current = null; };
+    rec.onend = () => {
+      recognitionRef.current = null;
+      setInterimText("");
+      if (streamRef.current) setTimeout(() => startSpeechRecRef.current(), 300);
+    };
+    try { rec.start(); recognitionRef.current = rec; } catch {}
+  }, []);
+
+  useEffect(() => { startSpeechRecRef.current = startSpeechRecognition; }, [startSpeechRecognition]);
+
   // ── Start/stop recording ─────────────────────────────────────────────────
   const startRecording = useCallback(async () => {
     if (recording) return;
@@ -399,9 +432,10 @@ export default function LiveSession() {
       humeIntervalRef.current = setInterval(sendHumeChunk, 2000);
 
       mr.start();
+      startSpeechRecognition();
       setRecording(true);
     } catch (err) { console.error("[LiveSession] getUserMedia:", err); }
-  }, [recording, sendChunk, sendHumeChunk]);
+  }, [recording, sendChunk, sendHumeChunk, startSpeechRecognition]);
 
   const stopRecording = useCallback(() => {
     if (chunkIntervalRef.current) clearInterval(chunkIntervalRef.current);
@@ -413,13 +447,17 @@ export default function LiveSession() {
     streamRef.current = null;
     audioCtxRef.current = null;
     analyserRef.current = null;
+    recognitionRef.current?.stop();
+    recognitionRef.current = null;
+    setInterimText("");
     setRecording(false);
   }, []);
 
+  // Start mic immediately on mount — speech metrics sent to backend when available
   useEffect(() => {
-    if (serverOnline === true && !recording) startRecording();
+    startRecording();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [serverOnline]);
+  }, []);
 
   useEffect(() => () => { stopRecording(); }, [stopRecording]);
 
@@ -594,19 +632,22 @@ export default function LiveSession() {
               letterSpacing: "0.08em", textTransform: "uppercase", paddingLeft: 8, display: "block", marginBottom: 4 }}>
               60s Confidence
             </span>
-            <ResponsiveContainer width="100%" height={44}>
-              <LineChart data={graphData}>
-                <YAxis domain={[0, 100]} hide />
-                <Line
-                  type="monotone"
-                  dataKey="v"
+            <svg width="100%" height="44"
+              viewBox={`0 0 ${GRAPH_MAX_PTS} 100`}
+              preserveAspectRatio="none"
+              style={{ display: "block" }}>
+              {graphData.length > 1 && (
+                <polyline
+                  fill="none"
                   stroke="#3B82F6"
-                  strokeWidth={1.2}
-                  dot={false}
-                  isAnimationActive={false}
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  vectorEffect="non-scaling-stroke"
+                  points={graphData.map((pt, i) => `${i},${100 - pt.v}`).join(" ")}
                 />
-              </LineChart>
-            </ResponsiveContainer>
+              )}
+            </svg>
           </div>
 
           {/* Vision metric bars */}
@@ -636,41 +677,6 @@ export default function LiveSession() {
             </div>
           )}
 
-          {/* Server status / mic control */}
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{
-              width: 5, height: 5, borderRadius: "50%", flexShrink: 0,
-              background: serverOnline === null ? "#444" : serverOnline ? "#10B981" : "#F43F5E",
-              boxShadow: serverOnline ? "0 0 5px rgba(16,185,129,0.7)" : "none",
-            }} />
-            <span style={{ fontFamily: FONT, fontSize: 9, color: "#777777",
-              letterSpacing: "0.08em", textTransform: "uppercase" }}>
-              {serverOnline === null ? "Checking…"
-                : serverOnline ? (recording ? "Recording" : "Ready")
-                : "Speech engine offline"}
-            </span>
-            {serverOnline && !recording && (
-              <button onClick={startRecording} style={{
-                marginLeft: "auto", fontFamily: FONT, fontSize: 9, fontWeight: 600,
-                color: "#3B82F6", background: "rgba(59,130,246,0.12)",
-                border: "1px solid rgba(59,130,246,0.25)", borderRadius: 6,
-                padding: "3px 8px", cursor: "pointer",
-              }}>
-                Start Mic
-              </button>
-            )}
-            {recording && (
-              <button onClick={stopRecording} style={{
-                marginLeft: "auto", fontFamily: FONT, fontSize: 9, fontWeight: 600,
-                color: "#F43F5E", background: "rgba(244,63,94,0.12)",
-                border: "1px solid rgba(244,63,94,0.25)", borderRadius: 6,
-                padding: "3px 8px", cursor: "pointer",
-              }}>
-                Stop
-              </button>
-            )}
-          </div>
-
           {/* Live transcript */}
           <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column", gap: 5 }}>
             <span style={{ fontFamily: FONT, fontSize: 9, fontWeight: 500,
@@ -678,15 +684,19 @@ export default function LiveSession() {
               Transcript
             </span>
             <div style={{ flex: 1, overflow: "auto" }}>
-              {transcript ? (
+              {(transcript || interimText) ? (
                 <p style={{ fontFamily: FONT, fontSize: 11, fontWeight: 300,
-                  color: speechScores && speechScores.composite >= 55 ? "#AAAAAA" : "#FF6B6B",
-                  lineHeight: 1.55, margin: 0 }}>
+                  color: "#AAAAAA", lineHeight: 1.55, margin: 0 }}>
                   {transcript}
+                  {interimText && (
+                    <span style={{ color: "#555555", fontStyle: "italic" }}>
+                      {transcript ? " " : ""}{interimText}
+                    </span>
+                  )}
                 </p>
               ) : (
                 <p style={{ fontFamily: FONT, fontSize: 10, color: "#666666", fontStyle: "italic", margin: 0 }}>
-                  {recording ? "Speak — updates every 3 s…" : "Waiting for mic…"}
+                  {recording ? "Speak — updates live…" : "Waiting for mic…"}
                 </p>
               )}
             </div>

@@ -1,7 +1,5 @@
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {
-  transpilePackages: ["recharts", "victory-vendor"],
-};
+const nextConfig: NextConfig = {};
 
 export default nextConfig;

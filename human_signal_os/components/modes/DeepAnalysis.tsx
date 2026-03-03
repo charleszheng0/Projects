@@ -1,9 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import {
-  BarChart, Bar, Cell, XAxis, YAxis, ResponsiveContainer, Tooltip,
-} from "recharts";
+
 import {
   processVideoFrames,
   averageVideoBreakdown,
@@ -113,6 +111,41 @@ function GradeBubble({ label, score }: { label: string; score: number }) {
         letterSpacing: "0.06em", textTransform: "uppercase", textAlign: "center" }}>
         {label}
       </span>
+    </div>
+  );
+}
+
+function MiniBarChart({
+  data, highlightName,
+}: {
+  data: Array<{ name: string; value: number }>;
+  highlightName?: string;
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: 180 }}>
+      <div style={{ flex: 1, display: "flex", alignItems: "flex-end", gap: 3, paddingLeft: 20 }}>
+        {data.map((entry, i) => {
+          const color = entry.value >= 55 ? "#10B981" : "#F43F5E";
+          const opacity = highlightName && entry.name !== highlightName ? 0.75 : 1;
+          return (
+            <div key={i} title={`${entry.name}: ${entry.value}`}
+              style={{ flex: 1, height: "100%", display: "flex", alignItems: "flex-end" }}>
+              <div style={{
+                width: "100%", height: `${entry.value}%`,
+                background: color, opacity,
+                borderRadius: "3px 3px 0 0",
+              }} />
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ display: "flex", gap: 3, paddingLeft: 20, paddingTop: 5 }}>
+        {data.map((entry, i) => (
+          <div key={i} style={{ flex: 1, textAlign: "center" }}>
+            <span style={{ fontFamily: FONT, fontSize: 8, color: "#666" }}>{entry.name}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -824,25 +857,7 @@ export default function DeepAnalysis() {
                     color: "#888888", letterSpacing: "0.08em", textTransform: "uppercase" }}>
                     Vision
                   </span>
-                  <ResponsiveContainer width="100%" height={180}>
-                    <BarChart data={visionData} margin={{ top: 0, right: 0, bottom: 0, left: -20 }}>
-                      <XAxis dataKey="name" tick={{ fill: "#666", fontSize: 9, fontFamily: FONT }} />
-                      <YAxis domain={[0, 100]} tick={{ fill: "#555", fontSize: 9 }} />
-                      <Tooltip
-                        contentStyle={{ background: "#1A1A1A", border: "1px solid #333", borderRadius: 8 }}
-                        labelStyle={{ color: "#CCC", fontSize: 11 }}
-                        itemStyle={{ color: "#AAA", fontSize: 11 }}
-                      />
-                      <Bar dataKey="value" radius={[3, 3, 0, 0]}>
-                        {visionData.map((entry, idx) => (
-                          <Cell key={idx}
-                            fill={entry.value >= 55 ? "#10B981" : "#F43F5E"}
-                            opacity={entry.name === biggestGap.metric ? 1 : 0.75}
-                          />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <MiniBarChart data={visionData} highlightName={biggestGap.metric} />
                 </div>
 
                 {/* Speech chart */}
@@ -851,25 +866,7 @@ export default function DeepAnalysis() {
                     color: "#888888", letterSpacing: "0.08em", textTransform: "uppercase" }}>
                     Speech
                   </span>
-                  <ResponsiveContainer width="100%" height={180}>
-                    <BarChart data={speechData} margin={{ top: 0, right: 0, bottom: 0, left: -20 }}>
-                      <XAxis dataKey="name" tick={{ fill: "#666", fontSize: 9, fontFamily: FONT }} />
-                      <YAxis domain={[0, 100]} tick={{ fill: "#555", fontSize: 9 }} />
-                      <Tooltip
-                        contentStyle={{ background: "#1A1A1A", border: "1px solid #333", borderRadius: 8 }}
-                        labelStyle={{ color: "#CCC", fontSize: 11 }}
-                        itemStyle={{ color: "#AAA", fontSize: 11 }}
-                      />
-                      <Bar dataKey="value" radius={[3, 3, 0, 0]}>
-                        {speechData.map((entry, idx) => (
-                          <Cell key={idx}
-                            fill={entry.value >= 55 ? "#10B981" : "#F43F5E"}
-                            opacity={0.75}
-                          />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <MiniBarChart data={speechData} />
                 </div>
               </div>
             </div>
