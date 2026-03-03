@@ -84,6 +84,15 @@ const POSE_CONNECTIONS: [number, number][] = [
   [24, 26], [26, 28],
 ];
 
+// ── Confidence score → green (#00e676) to red (#ff1744) color ─────────────────
+function lerpColor(t: number): string {
+  const c = Math.max(0, Math.min(1, t));
+  const r = Math.round(255 * c);
+  const g = Math.round(230 * (1 - c) + 23 * c);
+  const b = Math.round(118 * (1 - c) + 68 * c);
+  return `rgba(${r},${g},${b},0.85)`;
+}
+
 // ── Draw a continuous path through an ordered sequence of landmark indices ────
 function strokeContour(
   ctx: CanvasRenderingContext2D,
@@ -279,9 +288,9 @@ export default function FaceMeshCamera({
           strokeContour(ctx!, LIPS,      latestFace, dx, dy, dw, dh);
         }
 
-        // "dots" — full 468-point landmark dot cloud
+        // "dots" — full 468-point landmark dot cloud, colored by confidence score
         if (mode === "dots" && latestFace?.length) {
-          ctx!.fillStyle = "rgba(255,255,255,0.28)";
+          ctx!.fillStyle = lerpColor(confidenceRef.current);
           for (const lm of latestFace) {
             ctx!.beginPath();
             ctx!.arc(dx + lm.x * dw, dy + lm.y * dh, 1.2, 0, 2 * Math.PI);

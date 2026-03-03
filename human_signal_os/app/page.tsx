@@ -31,7 +31,12 @@ const DeepAnalysis = dynamic(() => import("@/components/modes/DeepAnalysis"), {
   loading: () => <ModeLoadingSpinner />,
 });
 
-type Mode = "deep" | "live" | "visual";
+const FaceDashboard = dynamic(() => import("@/components/modes/FaceDashboard"), {
+  ssr: false,
+  loading: () => <ModeLoadingSpinner />,
+});
+
+type Mode = "deep" | "live" | "visual" | "dashboard";
 
 const FONT = "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
 
@@ -90,6 +95,9 @@ export default function Home() {
           <ModeBtn active={mode === "visual"} onClick={() => setMode("visual")}>
             <VisualIcon /> Visual
           </ModeBtn>
+          <ModeBtn active={mode === "dashboard"} onClick={() => setMode("dashboard")}>
+            <DashboardIcon /> Face Dashboard
+          </ModeBtn>
         </nav>
 
         {/* Online indicator */}
@@ -103,9 +111,10 @@ export default function Home() {
 
       {/* ── Mode content ────────────────────────────────────────────────── */}
       <main style={{ flex: 1, minHeight: 0 }}>
-        {mode === "deep"   && <DeepAnalysis />}
-        {mode === "live"   && <LiveSession />}
-        {mode === "visual" && <VisualOnly />}
+        {mode === "deep"      && <DeepAnalysis />}
+        {mode === "live"      && <LiveSession />}
+        {mode === "visual"    && <VisualOnly />}
+        {mode === "dashboard" && <FaceDashboard />}
       </main>
     </div>
   );
@@ -160,6 +169,17 @@ function VisualIcon() {
     <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
       <path d="M1 6C2.5 3 9.5 3 11 6C9.5 9 2.5 9 1 6Z" stroke="currentColor" strokeWidth="1.3" />
       <circle cx="6" cy="6" r="1.5" fill="currentColor" />
+    </svg>
+  );
+}
+
+function DashboardIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+      <rect x="1" y="1" width="4.5" height="4.5" rx="1" stroke="currentColor" strokeWidth="1.3" />
+      <rect x="6.5" y="1" width="4.5" height="4.5" rx="1" stroke="currentColor" strokeWidth="1.3" />
+      <rect x="1" y="6.5" width="4.5" height="4.5" rx="1" stroke="currentColor" strokeWidth="1.3" />
+      <rect x="6.5" y="6.5" width="4.5" height="4.5" rx="1" stroke="currentColor" strokeWidth="1.3" />
     </svg>
   );
 }
