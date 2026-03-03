@@ -53,16 +53,18 @@ export default function Home() {
       }}>
         {/* Brand */}
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{
-            width: 28, height: 28, borderRadius: 6,
-            background: "#141414", border: "1px solid #242424",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <circle cx="7" cy="4.5" r="2" fill="white" />
-              <path d="M5.5 7.5 L4 9 L4 13 L10 13 L10 9 L8.5 7.5 Z" fill="white" />
-            </svg>
-          </div>
+          <svg width="38" height="30" viewBox="0 0 38 30" fill="none">
+            {/* Left bubble */}
+            <rect x="0" y="6" width="21" height="15" rx="3.5" fill="white" opacity="0.65" />
+            <path d="M5 21 L2.5 25.5 L9 21 Z" fill="white" opacity="0.65" />
+            <circle cx="7.5" cy="13.5" r="2" fill="var(--bg-panel)" />
+            <circle cx="13" cy="13.5" r="2" fill="var(--bg-panel)" />
+            {/* Right bubble */}
+            <rect x="15" y="0" width="23" height="17" rx="3.5" fill="white" />
+            <path d="M30 17 L35 23 L25 17 Z" fill="white" />
+            <circle cx="23" cy="8.5" r="2" fill="var(--bg-panel)" />
+            <circle cx="29.5" cy="8.5" r="2" fill="var(--bg-panel)" />
+          </svg>
           <div>
             <div style={{ color: "#FFFFFF", fontWeight: 600, fontSize: 15, letterSpacing: "-0.01em", lineHeight: 1 }}>
               Inflect

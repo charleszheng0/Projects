@@ -244,7 +244,7 @@ export default function LiveSession() {
   // ── Server health check ──────────────────────────────────────────────────
   const checkServer = useCallback(async () => {
     try {
-      const r = await fetch(`${PYTHON_URL}/health`, { signal: AbortSignal.timeout(2000) });
+      const r = await fetch(`${PYTHON_URL}/health`, { signal: AbortSignal.timeout(15000) });
       setServerOnline(r.ok);
     } catch { setServerOnline(false); }
   }, []);
@@ -647,7 +647,7 @@ export default function LiveSession() {
               letterSpacing: "0.08em", textTransform: "uppercase" }}>
               {serverOnline === null ? "Checking…"
                 : serverOnline ? (recording ? "Recording" : "Ready")
-                : "Python server offline"}
+                : "Speech engine offline"}
             </span>
             {serverOnline && !recording && (
               <button onClick={startRecording} style={{
@@ -687,7 +687,7 @@ export default function LiveSession() {
               ) : (
                 <p style={{ fontFamily: FONT, fontSize: 10, color: "#666666", fontStyle: "italic", margin: 0 }}>
                   {serverOnline === false
-                    ? "Start python server: cd python && python server.py"
+                    ? "Speech engine unavailable — transcript offline"
                     : recording ? "Speak — updates every 3 s…"
                     : "Waiting for mic…"}
                 </p>
