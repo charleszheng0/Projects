@@ -30,18 +30,12 @@ _ffprobe = shutil.which("ffprobe") or "/opt/homebrew/bin/ffprobe"
 AudioSegment.converter = _ffmpeg
 AudioSegment.ffprobe   = _ffprobe
 
-# ── Whisper "large" singleton (separate from the "base" used for live chunks) ──
+# ── Reuse the speech_module Whisper singleton (no second model load) ──────────
 
-_whisper_large = None
-
-def _get_whisper_large():
-    global _whisper_large
-    if _whisper_large is None:
-        import whisper
-        logger.info("[deep_analysis] Loading Whisper 'large' model (first run is slow)…")
-        _whisper_large = whisper.load_model("large")
-        logger.info("[deep_analysis] Whisper large ready.")
-    return _whisper_large
+def _get_whisper():
+    """Reuse the already-loaded Whisper model from speech_module."""
+    import speech_module
+    return speech_module.get_whisper_model()
 
 
 # ── Audio extraction from video ───────────────────────────────────────────────
@@ -205,66 +199,60 @@ def analyze_video(audio_path: str) -> dict:
     Returns:
         dict with keys: speech_metrics, transcript, pyaudio_emotion, hume, assemblyai
     """
-    import speech_module  # reuse existing metric functions
-
-    # ── Load audio ──────────────────────────────────────────────────────────
+    import speech_module
     import numpy as np
-    try:
-        import soundfile as sf
-        y, sr = sf.read(audio_path, dtype="float32")
-        if y.ndim > 1:
-            y = y.mean(axis=1)  # stereo → mono
-    except Exception:
-        import librosa
-        y, sr = librosa.load(audio_path, sr=16000, mono=True)
 
-    # ── Whisper large transcription ─────────────────────────────────────────
+    # ── Load audio once (reused for all metrics) ────────────────────────────
+    y, sr = speech_module.load_audio(audio_path, target_sr=16000)
+    duration = len(y) / sr
+
+    # ── Whisper transcription (single pass, reusing the shared model) ───────
     transcript_segments = []
+    full_text = ""
+    segments: list = []
     try:
-        model = _get_whisper_large()
-        result = model.transcribe(
-            audio_path,
-            word_timestamps=True,
-            language=None,      # auto-detect
-            verbose=False,
-        )
-        for seg in (result.get("segments") or []):
+        model = _get_whisper()
+        result = model.transcribe(audio_path, word_timestamps=False, verbose=False)
+        full_text = result.get("text", "")
+        segments  = result.get("segments", [])
+        for seg in segments:
             transcript_segments.append({
                 "text":  seg.get("text", "").strip(),
                 "start": round(seg.get("start", 0), 2),
                 "end":   round(seg.get("end", 0), 2),
             })
-        full_text = result.get("text", "")
     except Exception as e:
         logger.error(f"[deep_analysis] Whisper error: {e}")
-        full_text = ""
 
-    # ── Speech metrics (reuse speech_module functions) ──────────────────────
+    # ── Speech metrics (computed directly — no second Whisper call) ─────────
     try:
-        # Write audio to a temp file speech_module can load
-        tmp_wav = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
-        try:
-            import soundfile as sf
-            sf.write(tmp_wav.name, y, sr)
-        except Exception:
-            import scipy.io.wavfile as wv
-            wv.write(tmp_wav.name, sr, (y * 32767).astype(np.int16))
-        tmp_wav.close()
-        speech_result = speech_module.analyze_audio(tmp_wav.name)
-    except Exception as e:
-        logger.error(f"[deep_analysis] speech_module error: {e}")
-        speech_result = {
-            "pitch_variance":  50, "volume_trailing": 50,
-            "filler_density":  50, "speech_rate":     50,
-            "pause_quality":   50, "upspeak":         50,
-            "vocal_fry":       50, "composite":       50,
-            "transcript":      full_text,
+        pitch_var = speech_module.compute_pitch_variance(y, sr)
+        vol_trail = speech_module.compute_volume_trailing(y, sr)
+        filler    = speech_module.compute_filler_density(full_text, duration)
+        rate      = speech_module.compute_speech_rate_variance(segments, duration)
+        pauses    = speech_module.compute_pause_quality(segments, duration)
+        upspk     = speech_module.compute_upspeak(y, sr, segments)
+        fry       = speech_module.compute_vocal_fry(y, sr)
+        composite = speech_module.clamp(
+            pitch_var * 0.20 + vol_trail * 0.15 + filler * 0.20 +
+            rate      * 0.10 + pauses   * 0.15 + upspk  * 0.10 + fry * 0.10
+        ) * 100
+        speech_metrics = {
+            "pitch_variance":  round(pitch_var * 100),
+            "volume_trailing": round(vol_trail * 100),
+            "filler_density":  round(filler    * 100),
+            "speech_rate":     round(rate      * 100),
+            "pause_quality":   round(pauses    * 100),
+            "upspeak":         round(upspk     * 100),
+            "vocal_fry":       round(fry       * 100),
+            "composite":       round(composite),
         }
-    finally:
-        try:
-            os.unlink(tmp_wav.name)
-        except Exception:
-            pass
+    except Exception as e:
+        logger.error(f"[deep_analysis] speech metrics error: {e}")
+        speech_metrics = {k: 50 for k in (
+            "pitch_variance", "volume_trailing", "filler_density",
+            "speech_rate", "pause_quality", "upspeak", "vocal_fry", "composite"
+        )}
 
     # ── pyAudioAnalysis emotion ─────────────────────────────────────────────
     pyaudio_emotion = _run_pyaudio_emotion(audio_path)
@@ -276,16 +264,7 @@ def analyze_video(audio_path: str) -> dict:
     assemblyai_result = _call_assemblyai_stub(audio_path)
 
     return {
-        "speech_metrics": {
-            "pitch_variance":  speech_result.get("pitch_variance",  50),
-            "volume_trailing": speech_result.get("volume_trailing", 50),
-            "filler_density":  speech_result.get("filler_density",  50),
-            "speech_rate":     speech_result.get("speech_rate",     50),
-            "pause_quality":   speech_result.get("pause_quality",   50),
-            "upspeak":         speech_result.get("upspeak",         50),
-            "vocal_fry":       speech_result.get("vocal_fry",       50),
-            "composite":       speech_result.get("composite",       50),
-        },
+        "speech_metrics": speech_metrics,
         "transcript":      transcript_segments,
         "pyaudio_emotion": pyaudio_emotion,
         "hume":            hume_result,

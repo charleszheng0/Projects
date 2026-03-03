@@ -212,7 +212,7 @@ export default function DeepAnalysis() {
       const speechRes = await fetch(`${PYTHON_URL}/deep-analyze`, {
         method: "POST",
         body: form,
-        signal: AbortSignal.timeout(180_000),
+        signal: AbortSignal.timeout(600_000),
       });
       if (!speechRes.ok) throw new Error(`Server error ${speechRes.status}: ${await speechRes.text()}`);
       const speechData: DeepSpeechResult = await speechRes.json();
