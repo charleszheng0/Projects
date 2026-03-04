@@ -280,13 +280,13 @@ export default function SpeechAnalysis({ onSpeechScore }: SpeechAnalysisProps) {
   }, [stopRecording]);
 
   const METRIC_DEFS: Array<{ key: keyof SpeechScores; label: string; invert?: boolean }> = [
-    { key: "pitch_variance",  label: "Pitch Variance" },
-    { key: "volume_trailing", label: "Volume Sustain" },
-    { key: "filler_density",  label: "Filler Words",   invert: false },
-    { key: "speech_rate",     label: "Rate Consistency" },
-    { key: "pause_quality",   label: "Pause Quality" },
-    { key: "upspeak",         label: "No Upspeak" },
-    { key: "vocal_fry",       label: "No Vocal Fry" },
+    { key: "upspeak",         label: "Decisive Intonation" },
+    { key: "filler_density",  label: "Filler Words" },
+    { key: "pause_quality",   label: "Strategic Pauses" },
+    { key: "pitch_variance",  label: "Grounded Pitch" },
+    { key: "volume_trailing", label: "Volume Firmness" },
+    { key: "speech_rate",     label: "Pace & Flow" },
+    { key: "vocal_fry",       label: "Voice Clarity" },
   ];
 
   const isLoading = cyclesCompleted === 0;

@@ -136,7 +136,7 @@ export function scoreGaze(face: Pt[], baseline?: VisionBaseline | null): number 
 
   if (baseline) {
     const delta = baseline.irisGazeDev - avgDev; // positive = looking more central
-    return clamp(0.55 + delta * 3, 0, 1);
+    return clamp(0.5 + delta * 5, 0, 1);
   }
   // Raw: 0 dev = perfect eye contact, 0.35 dev = looking far away
   return norm(avgDev, 0.30, 0.04);
@@ -168,8 +168,9 @@ export function scoreMicroExpression(history: Pt[][]): number {
   const late   = mean(velocities.slice(mid));
   const decay  = early > 0 ? clamp(1 - late / (early + 1e-6), 0, 1) : 0.5;
 
-  // Good expression: moderate velocity (not frozen, not erratic) + natural decay
-  const velScore   = norm(avgVel, 0.0003, 0.003);  // optimal mid-range
+  // Good expression: some natural movement (not frozen) + natural decay
+  // Wide threshold — any speech-related face movement scores well
+  const velScore   = norm(avgVel, 0.00003, 0.0005);
   const decayScore = decay;
 
   return clamp(velScore * 0.6 + decayScore * 0.4, 0, 1);
@@ -195,7 +196,7 @@ export function scoreBrowTension(face: Pt[], baseline?: VisionBaseline | null): 
 
   // Tension signals: low gap OR narrow furrow
   const gapScore    = baseline
-    ? clamp(0.5 + (avgGap - baseline.browGap) * 20, 0, 1)
+    ? clamp(0.5 + (avgGap - baseline.browGap) * 24, 0, 1)
     : norm(avgGap, 0.018, 0.055);
   const furrowScore = norm(browFurrow, 0.05, 0.28); // low furrow spread = furrowed = tense
 
@@ -216,7 +217,7 @@ export function scoreLipCompression(face: Pt[], baseline?: VisionBaseline | null
 
   if (baseline) {
     const delta = ratio - baseline.lipRatio;
-    return clamp(0.5 + delta * 6, 0, 1); // higher ratio = more open = less compressed
+    return clamp(0.5 + delta * 10, 0, 1);
   }
   // Compressed: <0.04, neutral: ~0.08, relaxed/open: >0.14
   return norm(ratio, 0.03, 0.14);
@@ -266,7 +267,7 @@ export function scoreHeadPosition(face: Pt[], baseline?: VisionBaseline | null):
 
   if (baseline) {
     const delta = baseline.chinRatio - chinRatio; // positive = chin up vs baseline
-    return clamp(0.5 + delta * 8, 0, 1);
+    return clamp(0.5 + delta * 12, 0, 1);
   }
   // Tucked: ~0.50+, confident chin up: ~0.22–0.38
   return norm(chinRatio, 0.52, 0.22);
@@ -285,7 +286,7 @@ export function scoreDuchenneSmile(face: Pt[], baseline?: VisionBaseline | null)
   const smileLift = mouthTop.y - cornerY; // positive = corners lifted = smiling
 
   const smileScore = baseline
-    ? clamp(0.5 + (smileLift - baseline.smileLift) * 25, 0, 1)
+    ? clamp(0.5 + (smileLift - baseline.smileLift) * 30, 0, 1)
     : norm(smileLift, -0.005, 0.025);
 
   // Step 2: Cheek rise / eye crinkle (orbicularis oculi activation)
@@ -304,7 +305,7 @@ export function scoreDuchenneSmile(face: Pt[], baseline?: VisionBaseline | null)
     if (baseline) {
       // Smaller dist than baseline = cheeks rose = Duchenne indicator
       const delta = baseline.eyeCheekDist - avgDist;
-      crinkleScore = clamp(0.5 + delta * 15, 0, 1);
+      crinkleScore = clamp(0.5 + delta * 20, 0, 1);
     } else {
       // Small dist = crinkled (high Duchenne); large dist = no crinkle
       crinkleScore = norm(avgDist, 0.08, 0.03);
@@ -381,7 +382,7 @@ export function computeVisionScores(
 
 // ── Calibration helpers ───────────────────────────────────────────────────────
 
-const LS_KEY = "inflect_vision_baseline_v2";
+const LS_KEY = "inflect_vision_baseline_v3"; // v3: 2D iris deviation calibration
 
 export function loadVisionBaseline(): VisionBaseline | null {
   try { return JSON.parse(localStorage.getItem(LS_KEY) ?? "null"); } catch { return null; }

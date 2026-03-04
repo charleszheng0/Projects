@@ -1,21 +1,26 @@
 """
 Inflect — Speech Module
 =======================
-Analyzes raw audio waveforms to produce 7 confidence sub-scores.
+Analyzes raw audio waveforms to produce 7 confidence sub-scores aligned with
+evidence-based vocal authority dimensions.
 
 Metrics:
-  1. pitch_variance     — librosa.pyin()  →  dynamic pitch = confident
-  2. volume_trailing    — RMS envelope     →  not trailing off = confident
-  3. filler_density     — Whisper + regex  →  low filler rate = confident
-  4. speech_rate        — Whisper segments →  consistent rate = confident
-  5. pause_quality      — Whisper timing   →  strategic > anxious pauses
-  6. upspeak            — pitch curve on sentence endings
-  7. vocal_fry          — sub-70 Hz energy ratio
-
-Also uses pyAudioAnalysis for supplementary emotion feature extraction.
+  1. pitch_variance     — librosa.pyin() → grounded register (60%) + natural
+                          pitch movement (40%); lower, resonant pitch scores higher
+  2. volume_trailing    — RMS envelope   → overall volume firmness (50%) +
+                          non-trailing at sentence ends (50%)
+  3. filler_density     — Whisper + regex → low filler rate = confident
+  4. speech_rate        — Whisper segments → optimal WPM 120-160 (50%) +
+                          rate consistency (50%); rushing/slowing both penalized
+  5. pause_quality      — Whisper timing → strategic clause pauses > anxious
+                          mid-phrase silences
+  6. upspeak            — pitch curve on statement endings; falling intonation
+                          = decisive; rising = question-like = penalized
+  7. vocal_fry          — sub-70 Hz energy ratio; heavy fry = penalized
 
 All sub-scores are 0–100 (higher = more confident/better).
-`composite` is the weighted aggregate.
+`composite` is the weighted aggregate (upspeak + fillers weighted highest
+per user-defined priorities).
 """
 
 import os
@@ -95,12 +100,19 @@ def load_audio(path: str, target_sr: int = 16000) -> tuple[np.ndarray, int]:
     y, sr = librosa.load(path, sr=target_sr, mono=True)
     return y, target_sr
 
-# ── Metric 1: Pitch variance via pyin ─────────────────────────────────────────
+# ── Metric 1: Pitch — grounded register + natural movement ────────────────────
 
 def compute_pitch_variance(y: np.ndarray, sr: int) -> float:
     """
-    Higher pitch variance (in semitones) = more dynamic delivery = confident.
-    Very monotone speakers score low; natural variation scores high.
+    Two-component score reflecting vocal authority:
+
+    Groundedness (60%): speaker uses a low-to-mid register relative to their
+    own voiced range. A resonant, chest-voice delivery scores high; a thin,
+    nasal, or head-voice delivery scores low. Speaker-normalized so it works
+    for any voice type.
+
+    Variance (40%): natural pitch movement over the utterance — not monotone,
+    not erratic. Moderate variation signals engagement and conviction.
     """
     try:
         f0, voiced_flag, _ = librosa.pyin(
@@ -115,25 +127,43 @@ def compute_pitch_variance(y: np.ndarray, sr: int) -> float:
         if len(voiced) < 10:
             return 0.50
 
-        # Convert to semitone scale (log)
-        semitones = 12.0 * np.log2(voiced / (np.median(voiced) + 1e-6))
-        var_st = float(np.var(semitones))
+        # ── Groundedness: is the speaker using their lower register? ──────────
+        f0_lo  = float(np.percentile(voiced, 10))   # low-end anchor
+        f0_hi  = float(np.percentile(voiced, 90))   # high-end anchor
+        f0_med = float(np.median(voiced))
 
-        # Good natural variance: 20–80 semitone²
-        # Monotone: < 5 st²;  very expressive: > 100 st²
-        return norm(var_st, 5.0, 80.0)
+        if f0_hi - f0_lo < 10:                      # too little range to judge
+            groundedness = 0.50
+        else:
+            # 1.0 = speaking near their low end (grounded)
+            # 0.0 = speaking near their high end (thin/nasal)
+            groundedness = clamp(1.0 - (f0_med - f0_lo) / (f0_hi - f0_lo))
+
+        # ── Variance: natural pitch movement in semitones ─────────────────────
+        semitones = 12.0 * np.log2(voiced / (f0_med + 1e-6))
+        var_st    = float(np.var(semitones))
+        # Optimal natural variance: 15–70 semitone²
+        variance  = norm(var_st, 5.0, 70.0)
+
+        return clamp(0.60 * groundedness + 0.40 * variance)
 
     except Exception as e:
         logger.warning(f"[pitch_variance] {e}")
         return 0.50
 
 
-# ── Metric 2: Volume trailing at sentence ends ───────────────────────────────
+# ── Metric 2: Volume — firmness + non-trailing ────────────────────────────────
 
 def compute_volume_trailing(y: np.ndarray, sr: int) -> float:
     """
-    Confident speakers sustain volume to the end of utterances.
-    Trailing off (getting quieter at the end) signals low confidence.
+    Two-component score reflecting vocal projection:
+
+    Firmness (50%): overall RMS level relative to a well-projected voice.
+    Whispering or very quiet speech (suggesting insecurity) scores low.
+    Moderate-to-loud, assured volume scores high.
+
+    Non-trailing (50%): volume does not drop off at sentence ends — confident
+    speakers sustain energy through the final word rather than trailing off.
     """
     try:
         frame_length = int(sr * 0.05)   # 50 ms
@@ -144,15 +174,23 @@ def compute_volume_trailing(y: np.ndarray, sr: int) -> float:
         if n < 8:
             return 0.50
 
-        mid_rms = float(np.mean(rms[n // 4 : 3 * n // 4]))
-        end_rms = float(np.mean(rms[3 * n // 4 :]))
+        mean_rms = float(np.mean(rms))
+        mid_rms  = float(np.mean(rms[n // 4 : 3 * n // 4]))
+        end_rms  = float(np.mean(rms[3 * n // 4 :]))
 
+        # ── Firmness: is the speaker projecting enough? ───────────────────────
+        # Typical browser MediaRecorder audio: confident ~0.04–0.14 RMS,
+        # quiet/insecure < 0.015, very loud > 0.20
+        firmness = norm(mean_rms, 0.010, 0.110)
+
+        # ── Non-trailing: end volume vs mid-utterance volume ──────────────────
         if mid_rms < 1e-4:
-            return 0.50
+            trailing = 0.50
+        else:
+            ratio    = end_rms / (mid_rms + 1e-8)
+            trailing = norm(ratio, 0.40, 1.05)
 
-        # ratio > 1 = getting louder at end; ratio < 0.6 = severe trailing
-        ratio = end_rms / (mid_rms + 1e-8)
-        return norm(ratio, 0.45, 1.05)
+        return clamp(0.50 * firmness + 0.50 * trailing)
 
     except Exception as e:
         logger.warning(f"[volume_trailing] {e}")
@@ -186,31 +224,53 @@ def compute_filler_density(transcript: str, duration: float) -> float:
         return 0.50
 
 
-# ── Metric 4: Speech rate variance ───────────────────────────────────────────
+# ── Metric 4: Pace — optimal WPM + consistency ────────────────────────────────
 
 def compute_speech_rate_variance(segments: list, duration: float) -> float:
     """
-    Consistent speech rate → confident.
-    Coefficient of variation (CV) measures rate consistency.
+    Two-component score reflecting delivery pace:
+
+    Optimal WPM (50%): 120–160 words per minute is the authoritative sweet
+    spot — measured, deliberate, easy to follow. Rushing (>195 WPM) signals
+    anxiety; speaking too slowly (<90 WPM) can feel hesitant or flat.
+
+    Consistency (50%): steady rate across segments — confident speakers don't
+    lurch between rushing and crawling. Coefficient of variation (CV) measures
+    this; low CV = consistent = high score.
     """
     try:
-        rates = []
+        rates       = []
+        total_words = 0
+
         for seg in segments:
             words   = len(seg.get("text", "").split())
             seg_dur = seg.get("end", 0) - seg.get("start", 0)
             if seg_dur > 0.15 and words > 0:
                 rates.append(words / seg_dur)
+                total_words += words
 
+        # ── Optimal WPM ───────────────────────────────────────────────────────
+        if duration > 1.0 and total_words > 0:
+            wpm = (total_words / duration) * 60.0
+            if wpm < 120:
+                wpm_score = norm(wpm, 75.0, 120.0)       # ramp up to optimal floor
+            elif wpm <= 160:
+                wpm_score = 1.0                           # ideal zone
+            else:
+                wpm_score = norm(wpm, 210.0, 160.0)      # ramp down from optimal ceiling
+        else:
+            wpm_score = 0.55
+
+        # ── Consistency ───────────────────────────────────────────────────────
         if len(rates) < 2:
-            return 0.55
+            consistency = 0.55
+        else:
+            mean_r      = float(np.mean(rates))
+            std_r       = float(np.std(rates))
+            cv          = std_r / (mean_r + 1e-6)
+            consistency = norm(cv, 0.90, 0.10)
 
-        mean_r = float(np.mean(rates))
-        std_r  = float(np.std(rates))
-        cv     = std_r / (mean_r + 1e-6)
-
-        # Low CV = consistent = good. High CV = erratic.
-        # Comfortable range: CV < 0.35 (score approaches 1)
-        return norm(cv, 0.90, 0.10)
+        return clamp(0.50 * wpm_score + 0.50 * consistency)
 
     except Exception as e:
         logger.warning(f"[speech_rate] {e}")
@@ -426,15 +486,17 @@ def analyze_audio(audio_path: str) -> dict:
         # ── pyAudioAnalysis supplementary ─────────────────────────────────────
         paa = extract_paa_features(y, sr)
 
-        # ── Weighted composite ─────────────────────────────────────────────────
+        # ── Weighted composite (priority order per vocal authority research) ────
+        # Decisive intonation + filler words carry the most weight because they
+        # are the most perceptible signals of authority/nervousness to listeners.
         composite = clamp(
-            pitch_var * 0.20 +
-            vol_trail * 0.15 +
-            filler    * 0.20 +
-            rate      * 0.10 +
-            pauses    * 0.15 +
-            upspk     * 0.10 +
-            fry       * 0.10,
+            upspk     * 0.22 +   # decisive intonation (falling vs. rising)
+            filler    * 0.20 +   # filler word density
+            pauses    * 0.16 +   # strategic vs. anxious pauses
+            pitch_var * 0.15 +   # grounded, resonant register
+            vol_trail * 0.14 +   # firm, sustained volume
+            rate      * 0.08 +   # measured pace (WPM + consistency)
+            fry       * 0.05,    # voice clarity (no vocal fry)
         ) * 100
 
         return {

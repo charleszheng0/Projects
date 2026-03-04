@@ -38,10 +38,8 @@ export async function POST(_req: NextRequest) {
   }
 
   // ── Real Hume AI integration ─────────────────────────────────────────────
-  // TODO: Uncomment and implement when API key is ready
-  /*
   try {
-    const audioBlob = await req.blob();
+    const audioBlob = await _req.blob();
     const form = new FormData();
     form.append("json", JSON.stringify({ models: { prosody: {} } }));
     form.append("file", audioBlob, "chunk.webm");
@@ -51,34 +49,37 @@ export async function POST(_req: NextRequest) {
       headers: { "X-Hume-Api-Key": apiKey },
       body: form,
     });
+    if (!jobRes.ok) {
+      console.error("[/api/hume] job submit failed", jobRes.status, await jobRes.text());
+      return NextResponse.json({ confidence: 0.5, distress: 0.2, excitement: 0.3, calmness: 0.5 });
+    }
     const { job_id } = await jobRes.json();
 
-    // Poll for result (with timeout)
+    // Poll for result (max 10 s)
     for (let i = 0; i < 20; i++) {
       await new Promise(r => setTimeout(r, 500));
       const pollRes = await fetch(`https://api.hume.ai/v0/batch/jobs/${job_id}`, {
         headers: { "X-Hume-Api-Key": apiKey },
       });
       const poll = await pollRes.json();
-      if (poll.state.status === "COMPLETED") {
+      if (poll.state?.status === "COMPLETED") {
         const preds = poll.results?.predictions?.[0]?.results?.prosody
           ?.grouped_predictions?.[0]?.predictions ?? [];
-        // Map Hume emotion names to our schema
-        const get = (name: string) => preds.find((p: any) => p.name === name)?.score ?? 0;
+        const get = (name: string) => preds.find((p: { name: string; score: number }) => p.name === name)?.score ?? 0;
+        // "Confidence" is not a Hume emotion — proxy it from Determination + Pride + Contentment
+        const confidence = Math.min(1, (get("Determination") + get("Pride") + get("Contentment")) / 3);
         return NextResponse.json({
-          confidence:  get("Confidence"),
+          confidence,
           distress:    get("Distress"),
           excitement:  get("Excitement"),
           calmness:    get("Calmness"),
         });
       }
+      if (poll.state?.status === "FAILED") break;
     }
     return NextResponse.json({ confidence: 0.5, distress: 0.2, excitement: 0.3, calmness: 0.5 });
   } catch (err) {
     console.error("[/api/hume]", err);
-    return NextResponse.json({ error: "Hume API error" }, { status: 500 });
+    return NextResponse.json({ confidence: 0.5, distress: 0.2, excitement: 0.3, calmness: 0.5 });
   }
-  */
-
-  return NextResponse.json({ confidence: 0.5, distress: 0.2, excitement: 0.3, calmness: 0.5 });
 }

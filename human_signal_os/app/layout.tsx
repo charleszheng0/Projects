@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Inflect",
-  description: "Know how you sound before they do.",
+  description: "Know how you sound.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
