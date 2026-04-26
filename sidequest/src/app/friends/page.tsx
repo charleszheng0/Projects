@@ -50,7 +50,7 @@ interface Friendship {
   requester_id: string;
   addressee_id: string;
   status: string;
-  profiles?: { username: string };
+  profiles?: { username: string } | { username: string }[];
 }
 
 interface SearchResult {
@@ -107,7 +107,7 @@ export default function FriendsPage() {
       .select("id, requester_id, addressee_id, status, profiles!friendships_requester_id_fkey(username)")
       .eq("addressee_id", user.id)
       .eq("status", "pending");
-    setPendingIn((incoming as Friendship[]) ?? []);
+    setPendingIn(((incoming ?? []) as unknown as Friendship[]));
 
     // Load outgoing pending
     const { data: outgoing } = await supabase
@@ -275,7 +275,10 @@ export default function FriendsPage() {
                   </h3>
                   <div className="space-y-2">
                     {pendingIn.map((req) => {
-                      const username = (req.profiles as { username: string } | undefined)?.username ?? "Unknown";
+                      const profileValue = req.profiles;
+                      const username = Array.isArray(profileValue)
+                        ? profileValue[0]?.username ?? "Unknown"
+                        : profileValue?.username ?? "Unknown";
                       return (
                         <div key={req.id} className="bg-white rounded-2xl border border-stone-200 p-4 flex items-center gap-3">
                           <Avatar username={username} />
