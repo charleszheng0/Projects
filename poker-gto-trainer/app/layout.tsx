@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Orbitron, Montserrat, Rajdhani } from "next/font/google";
 import {
   ClerkProvider,
   SignInButton,
@@ -22,6 +22,24 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const orbitron = Orbitron({
+  variable: "--font-orbitron",
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+});
+
+const montserrat = Montserrat({
+  variable: "--font-montserrat",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+});
+
+const rajdhani = Rajdhani({
+  variable: "--font-rajdhani",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+});
+
 export const metadata: Metadata = {
   title: "Poker GTO Trainer",
   description: "Game Theory Optimal poker training application",
@@ -36,17 +54,17 @@ export default function RootLayout({
     <ClerkProvider>
       <html lang="en">
         <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+          className={`${geistSans.variable} ${geistMono.variable} ${orbitron.variable} ${montserrat.variable} ${rajdhani.variable} antialiased`}
           suppressHydrationWarning
         >
           <ClipboardPolyfill />
-          <header className="fixed top-0 right-0 z-50 p-4 pr-6">
+          <header className="account-slot">
             <SignedOut>
               <div className="flex gap-3">
                 <SignInButton>
                   <Button
                     variant="outline"
-                    className="border-gray-600 text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
+                    className="border-white/30 text-white hover:bg-white/10 hover:text-white transition-colors"
                   >
                     Sign In
                   </Button>
@@ -54,7 +72,7 @@ export default function RootLayout({
                 <SignUpButton>
                   <Button
                     variant="default"
-                    className="bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+                    className="bg-white text-black hover:bg-white/90 transition-colors"
                   >
                     Sign Up
                   </Button>
@@ -62,11 +80,12 @@ export default function RootLayout({
               </div>
             </SignedOut>
             <SignedIn>
-              <div className="flex items-center gap-4">
+              <div className="account-avatar">
                 <UserButton
                   appearance={{
                     elements: {
-                      avatarBox: "w-10 h-10",
+                      userButtonTrigger: "outline-none ring-0 shadow-none focus-visible:outline-none focus-visible:ring-0 hover:scale-[1.02] transition-transform",
+                      avatarBox: "w-10 h-10 shadow-none",
                     },
                   }}
                 />

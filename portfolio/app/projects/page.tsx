@@ -30,36 +30,68 @@ export default function ProjectsPage() {
         <MotionReveal delay={0.05}>
           <div className="bg-black/40 p-5 text-base text-muted space-y-2">
             <div className="font-semibold text-ink">
-              <a 
-                href="https://pokergtotrainer.vercel.app/" 
-                target="_blank" 
+              <a
+                href="https://credit-card-concierge-beta.vercel.app/"
+                target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-accent transition-colors"
               >
-                Poker GTO Trainer
+                Concierge ↗
               </a>
             </div>
             <p className="text-sm">
-              Browser-based poker GTO training platform using expected value analysis and street-by-street simulations. 
-              Implemented full hand-state logic and range-based scenarios with real-time feedback for users.
+              Scores 2,000+ credit cards against your actual spending to find the best one for you. Next.js, TypeScript, Supabase, Vercel.
             </p>
           </div>
         </MotionReveal>
         <MotionReveal delay={0.1}>
           <div className="bg-black/40 p-5 text-base text-muted space-y-2">
             <div className="font-semibold text-ink">
-              <a 
-                href="https://drive.google.com/file/d/1hUgF__nSSOGQQBVPqkY8W0cmBD67-HOJ/view?usp=sharing" 
-                target="_blank" 
+              <a
+                href="https://inflect-human-os.vercel.app/"
+                target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-accent transition-colors"
               >
-                Expandable Dilator
+                Inflect ↗
               </a>
             </div>
             <p className="text-sm">
-              Developed a prototype air-expandable biomedical dilator using Dragon Skin 10 silicone, 
-              reducing material costs by 63% through cost-benefit analysis and design trade-offs.
+              Real-time behavioral coaching app that tracks facial landmarks and pose points via MediaPipe and gives live feedback. Next.js, TypeScript, MediaPipe, Deepgram, Claude.
+            </p>
+          </div>
+        </MotionReveal>
+        <MotionReveal delay={0.15}>
+          <div className="bg-black/40 p-5 text-base text-muted space-y-2">
+            <div className="font-semibold text-ink">
+              <a
+                href="https://pokergtotrainer.vercel.app/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-accent transition-colors"
+              >
+                Poker GTO Trainer ↗
+              </a>
+            </div>
+            <p className="text-sm">
+              Browser-based GTO poker trainer with EV analysis and street-by-street simulations.
+            </p>
+          </div>
+        </MotionReveal>
+        <MotionReveal delay={0.2}>
+          <div className="bg-black/40 p-5 text-base text-muted space-y-2">
+            <div className="font-semibold text-ink">
+              <a
+                href="https://drive.google.com/file/d/1hUgF__nSSOGQQBVPqkY8W0cmBD67-HOJ/view?usp=sharing"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-accent transition-colors"
+              >
+                Expandable Dilator ↗
+              </a>
+            </div>
+            <p className="text-sm">
+              Prototype air-expandable biomedical dilator built with Dragon Skin 10 silicone.
             </p>
           </div>
         </MotionReveal>

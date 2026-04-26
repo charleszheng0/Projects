@@ -1,3 +1,195 @@
-[00:00:01.305] Server  LOG     ✓ Ready in 763ms
-[00:00:02.383] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:00:08.068] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:00:02.241] Server  LOG     ✓ Ready in 1973ms
+[00:00:08.484] Server  LOG     ○ Compiling / ...
+[00:00:18.601] Server  WARN    ⚠ ./app/page.tsx:214:31
+Module not found: Can't resolve 'mammoth/mammoth.browser'
+  212 |         "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  213 |       ) {
+> 214 |         const mammoth = await import("mammoth/mammoth.browser");
+      |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  215 |         const result = await mammoth.extractRawText({
+  216 |           arrayBuffer: await file.arrayBuffer()
+  217 |         });
+
+
+
+Import traces:
+  Client Component Browser:
+    ./app/page.tsx [Client Component Browser]
+    ./app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/page.tsx [Client Component SSR]
+    ./app/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[00:00:18.655] Server  WARN    ⚠ ./app/page.tsx:196:29
+Module not found: Can't resolve 'pdfjs-dist'
+  194 |
+  195 |       if (file.type === "application/pdf") {
+> 196 |         const pdfjs = await import("pdfjs-dist");
+      |                             ^^^^^^^^^^^^^^^^^^^^
+  197 |         pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+  198 |         const loadingTask = pdfjs.getDocument({ data: await file.arrayBuffer() });
+  199 |         const pdf = await loadingTask.promise;
+
+
+
+Import traces:
+  Client Component Browser:
+    ./app/page.tsx [Client Component Browser]
+    ./app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/page.tsx [Client Component SSR]
+    ./app/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[00:00:21.751] Server  WARN    ⚠ ./app/page.tsx:214:31
+Module not found: Can't resolve 'mammoth/mammoth.browser'
+  212 |         "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  213 |       ) {
+> 214 |         const mammoth = await import("mammoth/mammoth.browser");
+      |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  215 |         const result = await mammoth.extractRawText({
+  216 |           arrayBuffer: await file.arrayBuffer()
+  217 |         });
+
+
+
+Import traces:
+  Client Component Browser:
+    ./app/page.tsx [Client Component Browser]
+    ./app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/page.tsx [Client Component SSR]
+    ./app/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[00:00:21.770] Server  WARN    ⚠ ./app/page.tsx:196:29
+Module not found: Can't resolve 'pdfjs-dist'
+  194 |
+  195 |       if (file.type === "application/pdf") {
+> 196 |         const pdfjs = await import("pdfjs-dist");
+      |                             ^^^^^^^^^^^^^^^^^^^^
+  197 |         pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+  198 |         const loadingTask = pdfjs.getDocument({ data: await file.arrayBuffer() });
+  199 |         const pdf = await loadingTask.promise;
+
+
+
+Import traces:
+  Client Component Browser:
+    ./app/page.tsx [Client Component Browser]
+    ./app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/page.tsx [Client Component SSR]
+    ./app/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[00:00:22.368] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:04:17.188] Server  WARN    ⚠ ./app/page.tsx:214:31
+Module not found: Can't resolve 'mammoth/mammoth.browser'
+  212 |         "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  213 |       ) {
+> 214 |         const mammoth = await import("mammoth/mammoth.browser");
+      |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  215 |         const result = await mammoth.extractRawText({
+  216 |           arrayBuffer: await file.arrayBuffer()
+  217 |         });
+
+
+
+Import traces:
+  Client Component Browser:
+    ./app/page.tsx [Client Component Browser]
+    ./app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/page.tsx [Client Component SSR]
+    ./app/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[00:04:17.204] Server  WARN    ⚠ ./app/page.tsx:196:29
+Module not found: Can't resolve 'pdfjs-dist'
+  194 |
+  195 |       if (file.type === "application/pdf") {
+> 196 |         const pdfjs = await import("pdfjs-dist");
+      |                             ^^^^^^^^^^^^^^^^^^^^
+  197 |         pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+  198 |         const loadingTask = pdfjs.getDocument({ data: await file.arrayBuffer() });
+  199 |         const pdf = await loadingTask.promise;
+
+
+
+Import traces:
+  Client Component Browser:
+    ./app/page.tsx [Client Component Browser]
+    ./app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/page.tsx [Client Component SSR]
+    ./app/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[03:32:44.638] Server  WARN    ⚠ ./app/page.tsx:214:31
+Module not found: Can't resolve 'mammoth/mammoth.browser'
+  212 |         "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  213 |       ) {
+> 214 |         const mammoth = await import("mammoth/mammoth.browser");
+      |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  215 |         const result = await mammoth.extractRawText({
+  216 |           arrayBuffer: await file.arrayBuffer()
+  217 |         });
+
+
+
+Import traces:
+  Client Component Browser:
+    ./app/page.tsx [Client Component Browser]
+    ./app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/page.tsx [Client Component SSR]
+    ./app/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[03:32:44.645] Server  WARN    ⚠ ./app/page.tsx:196:29
+Module not found: Can't resolve 'pdfjs-dist'
+  194 |
+  195 |       if (file.type === "application/pdf") {
+> 196 |         const pdfjs = await import("pdfjs-dist");
+      |                             ^^^^^^^^^^^^^^^^^^^^
+  197 |         pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+  198 |         const loadingTask = pdfjs.getDocument({ data: await file.arrayBuffer() });
+  199 |         const pdf = await loadingTask.promise;
+
+
+
+Import traces:
+  Client Component Browser:
+    ./app/page.tsx [Client Component Browser]
+    ./app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/page.tsx [Client Component SSR]
+    ./app/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+

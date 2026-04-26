@@ -1,7 +1,7 @@
 import { Card, Hand, Position } from "./gto";
 import { GameStage } from "./postflop-gto";
 import { SolverNode, SolverAction, SolverGameState, lookupSolverNode, sampleAction, getBestEVAction, generatePositionKey, generateBoardKey, generatePotKey, createDefaultSolverNode, SolverTree } from "./solver-tree";
-import { ActionEngineGameState, PlayerState, bettingRoundClosed, getNextToAct } from "./action-engine";
+import { ActionEngineGameState, PlayerState, bettingRoundClosed, getNextToAct, applyAction } from "./action-engine";
 import { roundBB } from "./utils";
 
 /**
@@ -50,7 +50,7 @@ export function filterLegalActions(
           // Validate raise meets minimum raise requirement
           const raiseAmount = Math.floor(game.pot * action.size);
           const totalBet = game.currentBet + raiseAmount;
-          const minRaise = game.currentBet * 2; // Minimum raise is 2x the current bet
+          const minRaise = game.currentBet + game.lastRaiseIncrement; // Minimum raise to
           
           // Raise must be at least min-raise, and player must have enough chips
           const additionalNeeded = totalBet - player.currentBet;
@@ -148,7 +148,7 @@ export function validateRaiseSize(
   
   const raiseAmount = Math.floor(game.pot * action.size);
   const totalBet = game.currentBet + raiseAmount;
-  const minRaise = game.currentBet * 2; // Minimum raise is 2x current bet
+  const minRaise = game.currentBet + game.lastRaiseIncrement; // Minimum raise total
   
   // If raise doesn't meet minimum, adjust to minimum
   if (totalBet < minRaise) {
@@ -177,127 +177,22 @@ export function applyVillainAction(
   player: PlayerState,
   action: SolverAction
 ): void {
-  const toCall = game.currentBet - player.currentBet;
-  const potBefore = game.pot;
-  const stackBefore = player.stack;
-  const betBefore = player.currentBet;
-  
-  // Validate and adjust action if needed
-  const validatedAction = action.type === "raise" 
+  const validatedAction = action.type === "raise"
     ? validateRaiseSize(action, game, player)
     : action;
-  
-  switch (validatedAction.type) {
-    case "check":
-      if (toCall > 0) {
-        throw new Error(`Villain cannot check when facing bet of ${toCall} BB`);
-      }
-      // No pot/stack changes for check
-      break;
-      
-    case "fold":
-      player.folded = true;
-      // No pot/stack changes for fold (bets already in pot)
-      break;
-      
-    case "call":
-      if (toCall === 0) {
-        throw new Error("Villain cannot call when no bet to face");
-      }
-      const callAmount = Math.min(toCall, player.stack);
-      player.stack = Math.max(0, roundBB(player.stack - callAmount));
-      player.currentBet += callAmount;
-      game.pot = roundBB(game.pot + callAmount);
-      
-      // Validate: pot should increase by callAmount
-      if (Math.abs(game.pot - (potBefore + callAmount)) > 0.01) {
-        throw new Error(`Pot calculation error: expected ${potBefore + callAmount}, got ${game.pot}`);
-      }
-      break;
-      
-    case "bet":
-      if (toCall > 0) {
-        throw new Error("Villain cannot bet when facing a bet");
-      }
-      if (!validatedAction.size) {
-        throw new Error("Bet action requires size");
-      }
-      
-      const betAmount = Math.floor(game.pot * validatedAction.size);
-      if (betAmount <= 0) {
-        throw new Error(`Invalid bet size: ${betAmount}`);
-      }
-      
-      if (betAmount > player.stack) {
-        // All-in bet
-        const allInAmount = player.stack;
-        player.stack = 0;
-        player.currentBet += allInAmount;
-        game.currentBet = Math.max(game.currentBet, player.currentBet);
-        game.pot = roundBB(game.pot + allInAmount);
-      } else {
-        player.stack = Math.max(0, roundBB(player.stack - betAmount));
-        player.currentBet += betAmount;
-        game.currentBet = player.currentBet;
-        game.pot = roundBB(game.pot + betAmount);
-      }
-      
-      // Validate pot increase
-      const expectedPotIncrease = Math.min(betAmount, stackBefore);
-      if (Math.abs(game.pot - (potBefore + expectedPotIncrease)) > 0.01) {
-        throw new Error(`Pot calculation error on bet: expected ${potBefore + expectedPotIncrease}, got ${game.pot}`);
-      }
-      break;
-      
-    case "raise":
-      if (toCall === 0) {
-        throw new Error("Villain cannot raise when no bet to face");
-      }
-      if (!validatedAction.size) {
-        throw new Error("Raise action requires size");
-      }
-      
-      const raiseAmount = Math.floor(game.pot * validatedAction.size);
-      const totalBet = game.currentBet + raiseAmount;
-      const additionalAmount = totalBet - player.currentBet;
-      
-      // Validate minimum raise
-      const minRaise = game.currentBet * 2;
-      if (totalBet < minRaise && additionalAmount < player.stack) {
-        throw new Error(`Raise ${totalBet} does not meet minimum raise ${minRaise}`);
-      }
-      
-      if (additionalAmount > player.stack) {
-        // All-in raise
-        const allInAmount = player.stack;
-        player.stack = 0;
-        player.currentBet += allInAmount;
-        game.currentBet = Math.max(game.currentBet, player.currentBet);
-        game.pot = roundBB(game.pot + allInAmount);
-      } else {
-        player.stack = Math.max(0, roundBB(player.stack - additionalAmount));
-        player.currentBet = totalBet;
-        game.currentBet = totalBet;
-        game.pot = roundBB(game.pot + additionalAmount);
-      }
-      
-      // Validate pot increase
-      const expectedRaiseIncrease = Math.min(additionalAmount, stackBefore);
-      if (Math.abs(game.pot - (potBefore + expectedRaiseIncrease)) > 0.01) {
-        throw new Error(`Pot calculation error on raise: expected ${potBefore + expectedRaiseIncrease}, got ${game.pot}`);
-      }
-      break;
-      
-    default:
-      throw new Error(`Unknown action type: ${validatedAction.type}`);
+
+  if (validatedAction.type === "bet" && validatedAction.size) {
+    const betAmount = Math.floor(game.pot * validatedAction.size);
+    applyAction(game, player.seat, "bet", betAmount);
+    return;
   }
-  
-  // Record action in history
-  game.actionHistory.push({
-    seat: player.seat,
-    action: validatedAction.type,
-    betSize: validatedAction.size ? Math.floor(game.pot * validatedAction.size) : undefined,
-  });
+  if (validatedAction.type === "raise" && validatedAction.size) {
+    const raiseAmount = Math.floor(game.pot * validatedAction.size);
+    const totalBet = game.currentBet + raiseAmount;
+    applyAction(game, player.seat, "raise", totalBet);
+    return;
+  }
+  applyAction(game, player.seat, validatedAction.type);
 }
 
 /**
@@ -379,7 +274,7 @@ export async function runFlawlessVillainActions(
     
     // CRITICAL: Check if this villain needs to act (hasn't matched the bet)
     const toCall = game.currentBet - player.currentBet;
-    if (toCall === 0 && player.currentBet === game.currentBet) {
+    if (toCall === 0 && player.currentBet === game.currentBet && player.hasActedThisStreet) {
       // Villain has already matched the bet - move to next player
       const nextIndex = getNextToAct(game, (actingIndex + 1) % game.players.length);
       if (nextIndex === null) {

@@ -22,6 +22,9 @@ export function convertToActionEngineState(): ActionEngineGameState {
       seat,
       stack: state.playerStacksBB[seat] || 0,
       currentBet: state.playerBetsBB[seat] || 0,
+      committedTotal: state.playerCommittedTotal?.[seat] ?? (state.playerBetsBB[seat] || 0),
+      hasActedThisStreet: state.playerHasActedThisStreet?.[seat] ?? false,
+      isAllIn: (state.playerStacksBB[seat] || 0) === 0,
       folded: state.foldedPlayers[seat] || false,
       isVillain: !isHero,
       position,
@@ -37,9 +40,10 @@ export function convertToActionEngineState(): ActionEngineGameState {
     nextToActIndex = opponent?.seat ?? state.playerSeat;
   }
 
+  const committedSum = players.reduce((sum, p) => sum + p.committedTotal, 0);
   return {
     street: state.gameStage,
-    pot: state.pot,
+    pot: Math.round(committedSum * 100) / 100,
     currentBet: state.currentBet,
     players,
     communityCards: state.communityCards,
@@ -51,6 +55,9 @@ export function convertToActionEngineState(): ActionEngineGameState {
       betSize: a.betSize,
     })),
     solverTree: state.solverTree,
+    lastRaiseIncrement: state.lastRaiseIncrement ?? state.bigBlind,
+    bigBlind: state.bigBlind,
+    smallBlind: state.bigBlind / 2,
   };
 }
 
@@ -65,24 +72,37 @@ export function applyActionEngineStateToStore(
   // Update stacks and bets
   const playerStacksBB = [...state.playerStacksBB];
   const playerBetsBB = [...state.playerBetsBB];
+  const playerCommittedTotal = [...(state.playerCommittedTotal || [])];
+  const playerHasActedThisStreet = [...(state.playerHasActedThisStreet || [])];
   const foldedPlayers = [...state.foldedPlayers];
 
   engineState.players.forEach(player => {
     playerStacksBB[player.seat] = player.stack;
     playerBetsBB[player.seat] = player.currentBet;
     foldedPlayers[player.seat] = player.folded;
+    playerCommittedTotal[player.seat] = player.committedTotal;
+    playerHasActedThisStreet[player.seat] = player.hasActedThisStreet;
   });
 
   // Determine if it's player's turn
   const isPlayerTurn = engineState.nextToActIndex === state.playerSeat;
   
   // Update store
+  const heroPlayer = engineState.players[state.playerSeat];
+  const toCall = Math.max(0, engineState.currentBet - (heroPlayer?.currentBet || 0));
+  const actionToFace = toCall > 0 ? "bet" : "check";
+
   useGameStore.setState({
     pot: engineState.pot,
     currentBet: engineState.currentBet,
     playerStacksBB,
+    playerStackBB: playerStacksBB[state.playerSeat],
     playerBetsBB,
+    playerCommittedTotal,
+    playerHasActedThisStreet,
     foldedPlayers,
+    actionToFace,
+    lastRaiseIncrement: engineState.lastRaiseIncrement,
     actionHistory: engineState.actionHistory.map(a => ({
       player: a.seat === state.playerSeat ? "You" : `Player ${a.seat + 1}`,
       action: a.action,

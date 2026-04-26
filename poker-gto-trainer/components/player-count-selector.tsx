@@ -2,7 +2,6 @@
 
 import { useGameStore } from "@/store/game-store";
 import { Button } from "./ui/button";
-import { Card } from "./ui/card";
 
 export function PlayerCountSelector() {
   const { numPlayers, isRandomPlayers, setNumPlayers, setRandomPlayers } = useGameStore();
@@ -10,51 +9,44 @@ export function PlayerCountSelector() {
   const playerCounts = [2, 3, 4, 5, 6, 7, 8, 9];
 
   return (
-    <Card className="p-4 bg-gray-800/50 border-gray-700">
-      <div className="flex flex-col gap-3">
-        <label className="text-sm font-semibold text-gray-300 text-center">
-          Number of Players
-        </label>
-        <div className="flex flex-wrap gap-2 justify-center">
-          {playerCounts.map((count) => (
-            <Button
-              key={count}
-              variant={!isRandomPlayers && numPlayers === count ? "default" : "outline"}
-              size="sm"
-              onClick={() => {
-                setRandomPlayers(false);
-                setNumPlayers(count);
-              }}
-              disabled={isRandomPlayers}
-              className={
-                !isRandomPlayers && numPlayers === count
-                  ? "bg-blue-600 hover:bg-blue-700 text-white"
-                  : "border-gray-600 text-gray-300 hover:bg-gray-800 disabled:opacity-50"
-              }
-            >
-              {count}
-            </Button>
-          ))}
+    <div className="flex items-center gap-3">
+      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+        Number of Players
+      </span>
+      <div className="flex flex-wrap gap-1">
+        {playerCounts.map((count) => (
           <Button
-            variant={isRandomPlayers ? "default" : "outline"}
+            key={count}
+            variant={!isRandomPlayers && numPlayers === count ? "default" : "outline"}
             size="sm"
-            onClick={() => setRandomPlayers(true)}
+            onClick={() => {
+              setRandomPlayers(false);
+              setNumPlayers(count);
+            }}
+            disabled={isRandomPlayers}
             className={
-              isRandomPlayers
-                ? "bg-purple-600 hover:bg-purple-700 text-white"
-                : "border-gray-600 text-gray-300 hover:bg-gray-800"
+              !isRandomPlayers && numPlayers === count
+                ? "bg-amber-500 hover:bg-amber-400 text-black"
+                : "border-gray-700 text-gray-300 hover:bg-gray-800 disabled:opacity-50"
             }
           >
-            Random
+            {count}
           </Button>
-        </div>
-        {isRandomPlayers && (
-          <p className="text-xs text-gray-400 text-center mt-1">
-            Player count will be random (2-9) for each hand
-          </p>
-        )}
+        ))}
+        <Button
+          variant={isRandomPlayers ? "default" : "outline"}
+          size="sm"
+          onClick={() => setRandomPlayers(true)}
+          className={
+            isRandomPlayers
+              ? "bg-amber-500 hover:bg-amber-400 text-black"
+              : "border-gray-700 text-gray-300 hover:bg-gray-800"
+          }
+        >
+          Random
+        </Button>
       </div>
-    </Card>
+    </div>
   );
 }
 

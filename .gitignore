@@ -1,0 +1,19 @@
+# Dependencies — never commit these
+**/node_modules/
+
+# Next.js build output
+**/.next/
+**/out/
+
+# Env files — keep secrets local
+**/.env
+**/.env.local
+**/.env.*.local
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Editor
+.vscode/settings.json
+*.pem

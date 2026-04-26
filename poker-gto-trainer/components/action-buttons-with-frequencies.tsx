@@ -1,66 +1,48 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
+import { Info } from "lucide-react";
 import { useGameStore } from "@/store/game-store";
 import { Action } from "@/lib/gto";
 import { BettingAction } from "@/lib/postflop-gto";
 import { getRealisticFrequencies, ActionFrequency } from "@/lib/gto-frequencies";
-import { useState, useEffect } from "react";
 import { formatBB } from "@/lib/utils";
 import { validateAction, getAvailableActions } from "@/lib/action-validation";
+import { getWhyBetContent } from "@/lib/why-bet";
+import { analyzeBoardTexture } from "@/lib/sidebar-analysis";
 import { ContinueButton } from "./continue-button";
 
-/**
- * Determine correctness level based on EV loss and isCorrect flag
- */
-function getCorrectnessLevel(isCorrect: boolean | null, evLoss: number): "correct" | "best-move" | "inaccuracy" | "mistake" | "blunder" | null {
-  if (isCorrect === null) return null;
-  if (isCorrect) {
-    if (evLoss < 0.1) return "best-move";
-    return "correct";
-  }
-  if (evLoss >= 2.0) return "blunder";
-  if (evLoss >= 0.5) return "mistake";
-  return "inaccuracy";
+type ActionButton = {
+  id: string;
+  action: Action | BettingAction;
+  betSize?: number;
+  label: string;
+  frequency: number;
+  enabled: boolean;
+  isAllIn?: boolean;
+};
+
+function formatPercent(pot: number, betSize?: number): number {
+  if (!betSize || pot <= 0) return 0;
+  return Math.round((betSize / pot) * 100);
 }
 
-/**
- * Get correctness label text
- */
-function getCorrectnessLabel(level: "correct" | "best-move" | "inaccuracy" | "mistake" | "blunder" | null): string {
-  switch (level) {
-    case "best-move": return "Best Move";
-    case "correct": return "Correct";
-    case "inaccuracy": return "Inaccuracy";
-    case "mistake": return "Mistake";
-    case "blunder": return "Blunder";
-    default: return "";
-  }
+function buildSizeLabel(
+  action: "bet" | "raise",
+  pot: number,
+  betSize: number
+): string {
+  const percent = formatPercent(pot, betSize);
+  return `${action === "bet" ? "Bet" : "Raise"} ${percent}% (${formatBB(betSize)} BB)`;
 }
 
-/**
- * Get correctness label color
- */
-function getCorrectnessColor(level: "correct" | "best-move" | "inaccuracy" | "mistake" | "blunder" | null): string {
-  switch (level) {
-    case "best-move": return "text-green-400";
-    case "correct": return "text-green-300";
-    case "inaccuracy": return "text-yellow-400";
-    case "mistake": return "text-orange-400";
-    case "blunder": return "text-red-400";
-    default: return "";
-  }
-}
-
-/**
- * GTO Wizard-style action buttons with perfect morphing animations
- */
 export function ActionButtonsWithFrequencies() {
-  const { 
-    playerHand, 
-    gameStage, 
-    actionToFace, 
-    isPlayerTurn, 
-    currentBet, 
+  const {
+    playerHand,
+    gameStage,
+    actionToFace,
+    isPlayerTurn,
+    currentBet,
     pot,
     bigBlind,
     playerStackBB,
@@ -68,629 +50,427 @@ export function ActionButtonsWithFrequencies() {
     numPlayers,
     selectAction,
     confirmBetSize,
-    optimalActions, 
-    isCorrect,
-    lastAction,
-    betSizeBB,
-    evLoss,
+    optimalActions,
     playerBetsBB,
     playerSeat,
-    currentHandId
+    lastRaiseIncrement,
+    opponentArchetype,
+    strategyMode,
+    communityCards,
+    lastAction,
+    betSizeBB,
   } = useGameStore();
-  
-  const [selectedAction, setSelectedAction] = useState<{action: string, betSize?: number} | null>(null);
-  const [showFeedback, setShowFeedback] = useState(false);
-  const [animationPhase, setAnimationPhase] = useState<"idle" | "morphing" | "complete">("idle");
 
-  // Trigger feedback animation when user makes a choice
-  useEffect(() => {
-    if (isCorrect !== null && lastAction !== null && !isPlayerTurn) {
-      // Start morphing animation
-      setShowFeedback(true);
-      setAnimationPhase("morphing");
-      
-      // Complete morphing after 220ms (matching GTO Wizard timing)
-      const morphTimer = setTimeout(() => {
-        setAnimationPhase("complete");
-      }, 220);
-      
-      return () => clearTimeout(morphTimer);
-    } else if (isPlayerTurn) {
-      // Reset when new action available
-      setShowFeedback(false);
-      setAnimationPhase("idle");
-      setSelectedAction(null);
-    } else {
-      setShowFeedback(false);
-      setAnimationPhase("idle");
-    }
-  }, [isCorrect, lastAction, isPlayerTurn]);
+  const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [isConfirming, setIsConfirming] = useState(false);
 
-  // CRITICAL: Show buttons when it's player's turn OR when showing feedback
-  // But disable all buttons when not player's turn
-  if (!playerHand) {
-    return null;
-  }
-  
-  // Show buttons even when showing feedback, but disable them if not player's turn
-  const buttonsDisabled = !isPlayerTurn && !showFeedback;
-  
-  if (!isPlayerTurn && !showFeedback) {
-    // Don't show buttons when not player's turn and not showing feedback
-    return null;
-  }
+  const {
+    buttons,
+    highestFrequencyId,
+  } = useMemo(() => {
+    if (!playerHand) {
+      return { buttons: [] as ActionButton[], highestFrequencyId: null as string | null };
+    }
 
-  // CRITICAL: Use validation system to determine available actions
-  const isPreflop = gameStage === "preflop";
-  const playerCurrentBet = playerBetsBB?.[playerSeat] || 0;
-  const availableActions = getAvailableActions(
-    gameStage,
-    actionToFace,
-    currentBet,
-    playerCurrentBet,
-    isPreflop
-  );
-  
-  const canCheck = availableActions.includes("check");
-  const canBet = availableActions.includes("bet");
-  const canCall = availableActions.includes("call");
-  const canFold = availableActions.includes("fold");
-  const canRaise = availableActions.includes("raise");
-
-  // Calculate GTO frequencies for all actions
-  const actionFrequencies = playerHand && optimalActions.length > 0
-    ? getRealisticFrequencies(
-        playerHand,
-        playerPosition,
-        gameStage,
-        pot,
-        currentBet,
-        actionToFace,
-        optimalActions as Action[],
-        numPlayers,
-        playerStackBB
-      )
-    : [];
-
-  // Filter frequencies based on available actions
-  let availableFrequencies = actionFrequencies.filter(freq => {
-    if (freq.action === "fold" && !canFold) return false;
-    if (freq.action === "check" && !canCheck) return false;
-    if (freq.action === "call" && !canCall) return false;
-    if (freq.action === "bet" && !canBet) return false;
-    if (freq.action === "raise" && !canRaise) return false;
-    return true;
-  });
-
-  // Check if we have frequencies for all available actions
-  const hasFold = availableFrequencies.some(f => f.action === "fold");
-  const hasCheck = availableFrequencies.some(f => f.action === "check");
-  const hasCall = availableFrequencies.some(f => f.action === "call");
-  const hasBet = availableFrequencies.some(f => f.action === "bet");
-  const hasRaise = availableFrequencies.some(f => f.action === "raise");
-
-  // Create default buttons if no frequencies calculated
-  if (availableFrequencies.length === 0) {
-    const defaultButtons: ActionFrequency[] = [];
-    
-    if (canFold) {
-      defaultButtons.push({
-        action: "fold",
-        frequency: 0,
-        label: "FOLD"
-      });
-    }
-    
-    if (canCall) {
-      defaultButtons.push({
-        action: "call",
-        frequency: 0,
-        label: `CALL ${currentBet > 0 ? `${formatBB(currentBet)} BB` : ""}`
-      });
-    }
-    
-    if (canCheck) {
-      defaultButtons.push({
-        action: "check",
-        frequency: 0,
-        label: "CHECK"
-      });
-    }
-    
-    if (canBet) {
-      const betSizes = [
-        { size: Math.round((pot * 0.33) * 10) / 10 },
-        { size: Math.round((pot * 0.67) * 10) / 10 },
-        { size: Math.round((pot * 1.3) * 10) / 10 },
-      ];
-      
-      betSizes.forEach(betSize => {
-        defaultButtons.push({
-          action: "bet",
-          betSize: betSize.size,
-          frequency: 0,
-          label: `BET ${formatBB(betSize.size)} BB`
-        });
-      });
-      
-      const allInSize = playerStackBB || pot * 10;
-      defaultButtons.push({
-        action: "bet",
-        betSize: allInSize,
-        frequency: 0,
-        label: `ALL-IN ${formatBB(allInSize)} BB`
-      });
-    }
-    
-    if (canRaise) {
-      // Calculate minimum raise amount
-      const minRaiseAmount = currentBet > 0 ? currentBet * 2 : bigBlind * 2;
-      
-      // Get player's remaining stack (stack minus current bet)
-      const currentPlayerBet = playerBetsBB?.[playerSeat] || 0;
-      const remainingStack = Math.max(0, (playerStackBB || 100) - currentPlayerBet);
-      
-      // Calculate raise sizes as increments above current bet
-      // Ensure each raise size is unique and properly incremented
-      const raiseSizes: number[] = [];
-      
-      if (currentBet > 0) {
-        // When facing a bet, calculate raises as increments above current bet
-        const increment = Math.max(bigBlind, Math.round(currentBet * 0.5 * 10) / 10); // Minimum increment
-        
-        // 2.5x raise (minimum)
-        const raise25x = Math.max(minRaiseAmount, Math.round(currentBet * 2.5 * 10) / 10);
-        if (raise25x > currentBet && !raiseSizes.includes(raise25x)) {
-          raiseSizes.push(raise25x);
-        }
-        
-        // 3x raise
-        const raise3x = Math.round(currentBet * 3 * 10) / 10;
-        if (raise3x > currentBet && !raiseSizes.includes(raise3x)) {
-          raiseSizes.push(raise3x);
-        }
-        
-        // 4x raise
-        const raise4x = Math.round(currentBet * 4 * 10) / 10;
-        if (raise4x > currentBet && !raiseSizes.includes(raise4x)) {
-          raiseSizes.push(raise4x);
-        }
-        
-        // Pot-sized raise
-        const potRaise = Math.round((pot + currentBet) * 10) / 10;
-        if (potRaise > currentBet && !raiseSizes.includes(potRaise)) {
-          raiseSizes.push(potRaise);
-        }
-      } else {
-        // Preflop or no bet - use pot-based sizing
-        const pot33 = Math.round((pot * 0.33) * 10) / 10;
-        const pot67 = Math.round((pot * 0.67) * 10) / 10;
-        const pot130 = Math.round((pot * 1.3) * 10) / 10;
-        
-        // Ensure minimum raise and uniqueness
-        if (pot33 >= minRaiseAmount && !raiseSizes.includes(pot33)) {
-          raiseSizes.push(pot33);
-        }
-        if (pot67 >= minRaiseAmount && pot67 !== pot33 && !raiseSizes.includes(pot67)) {
-          raiseSizes.push(pot67);
-        }
-        if (pot130 >= minRaiseAmount && pot130 !== pot67 && pot130 !== pot33 && !raiseSizes.includes(pot130)) {
-          raiseSizes.push(pot130);
-        }
-        
-        // If we don't have enough unique sizes, add increments
-        if (raiseSizes.length < 3) {
-          let nextSize = minRaiseAmount;
-          while (raiseSizes.length < 3 && nextSize < (playerStackBB || 200)) {
-            if (!raiseSizes.includes(nextSize)) {
-              raiseSizes.push(nextSize);
-            }
-            nextSize = Math.round((nextSize + bigBlind) * 10) / 10;
-          }
-        }
-      }
-      
-      // Sort raise sizes and add buttons
-      // Calculate total bet size (current bet + raise amount)
-      raiseSizes.sort((a, b) => a - b).forEach(raiseSize => {
-        // raiseSize is the total bet amount, not the raise increment
-        const totalBetSize = raiseSize;
-        const raiseIncrement = totalBetSize - currentBet;
-        
-        // Only show if raise increment is valid and within stack
-        if (totalBetSize > currentBet && raiseIncrement <= remainingStack && totalBetSize <= (playerStackBB || 200)) {
-          defaultButtons.push({
-            action: "raise",
-            betSize: totalBetSize,
-            frequency: 0,
-            label: `RAISE ${formatBB(totalBetSize)} BB`
-          });
-        }
-      });
-      
-      // Add all-in if it's different and valid
-      const allInSize = remainingStack + currentPlayerBet; // Total stack including current bet
-      if (allInSize > currentBet && !raiseSizes.includes(allInSize) && allInSize > 0) {
-        defaultButtons.push({
-          action: "raise",
-          betSize: allInSize,
-          frequency: 0,
-          label: `ALL-IN ${formatBB(allInSize)} BB`
-        });
-      }
-    }
-    
-    availableFrequencies = defaultButtons;
-  } else {
-    // Merge missing actions with existing frequencies
-    const missingButtons: ActionFrequency[] = [];
-    
-    if (canBet && !hasBet) {
-      const betSizes = [
-        { size: Math.round((pot * 0.33) * 10) / 10 },
-        { size: Math.round((pot * 0.67) * 10) / 10 },
-        { size: Math.round((pot * 1.3) * 10) / 10 },
-      ];
-      
-      betSizes.forEach(betSize => {
-        missingButtons.push({
-          action: "bet",
-          betSize: betSize.size,
-          frequency: 0,
-          label: `BET ${formatBB(betSize.size)} BB`
-        });
-      });
-      
-      const allInSize = playerStackBB || pot * 10;
-      missingButtons.push({
-        action: "bet",
-        betSize: allInSize,
-        frequency: 0,
-        label: `ALL-IN ${formatBB(allInSize)} BB`
-      });
-    }
-    
-    if (canCheck && !hasCheck) {
-      missingButtons.push({
-        action: "check",
-        frequency: 0,
-        label: "CHECK"
-      });
-    }
-    
-    if (canCall && !hasCall) {
-      missingButtons.push({
-        action: "call",
-        frequency: 0,
-        label: `CALL ${currentBet > 0 ? `${formatBB(currentBet)} BB` : ""}`
-      });
-    }
-    
-    if (canFold && !hasFold) {
-      missingButtons.push({
-        action: "fold",
-        frequency: 0,
-        label: "FOLD"
-      });
-    }
-    
-    if (canRaise && !hasRaise) {
-      const minRaiseAmount = currentBet > 0 ? currentBet * 2 : bigBlind * 2;
-      const currentPlayerBet = playerBetsBB?.[playerSeat] || 0;
-      const remainingStack = Math.max(0, (playerStackBB || 100) - currentPlayerBet);
-      const raiseSizes: number[] = [];
-      
-      if (currentBet > 0) {
-        const increment = Math.max(bigBlind, Math.round(currentBet * 0.5 * 10) / 10);
-        const raise25x = Math.max(minRaiseAmount, Math.round(currentBet * 2.5 * 10) / 10);
-        if (raise25x > currentBet && !raiseSizes.includes(raise25x)) {
-          raiseSizes.push(raise25x);
-        }
-        const raise3x = Math.round(currentBet * 3 * 10) / 10;
-        if (raise3x > currentBet && !raiseSizes.includes(raise3x)) {
-          raiseSizes.push(raise3x);
-        }
-        const raise4x = Math.round(currentBet * 4 * 10) / 10;
-        if (raise4x > currentBet && !raiseSizes.includes(raise4x)) {
-          raiseSizes.push(raise4x);
-        }
-        const potRaise = Math.round((pot + currentBet) * 10) / 10;
-        if (potRaise > currentBet && !raiseSizes.includes(potRaise)) {
-          raiseSizes.push(potRaise);
-        }
-      } else {
-        const pot33 = Math.round((pot * 0.33) * 10) / 10;
-        const pot67 = Math.round((pot * 0.67) * 10) / 10;
-        const pot130 = Math.round((pot * 1.3) * 10) / 10;
-        if (pot33 >= minRaiseAmount && !raiseSizes.includes(pot33)) raiseSizes.push(pot33);
-        if (pot67 >= minRaiseAmount && pot67 !== pot33 && !raiseSizes.includes(pot67)) raiseSizes.push(pot67);
-        if (pot130 >= minRaiseAmount && pot130 !== pot67 && pot130 !== pot33 && !raiseSizes.includes(pot130)) raiseSizes.push(pot130);
-      }
-      
-      raiseSizes.sort((a, b) => a - b).forEach(raiseSize => {
-        const totalBetSize = raiseSize;
-        const raiseIncrement = totalBetSize - currentBet;
-        if (totalBetSize > currentBet && raiseIncrement <= remainingStack && totalBetSize <= (playerStackBB || 200)) {
-          missingButtons.push({
-            action: "raise",
-            betSize: totalBetSize,
-            frequency: 0,
-            label: `RAISE ${formatBB(totalBetSize)} BB`
-          });
-        }
-      });
-      
-      const allInSize = remainingStack + currentPlayerBet;
-      if (allInSize > currentBet && !raiseSizes.includes(allInSize) && allInSize > 0) {
-        missingButtons.push({
-          action: "raise",
-          betSize: allInSize,
-          frequency: 0,
-          label: `ALL-IN ${formatBB(allInSize)} BB`
-        });
-      }
-    }
-    
-    // Merge missing buttons with existing frequencies
-    availableFrequencies = [...availableFrequencies, ...missingButtons];
-  }
-
-  const handleActionClick = (frequency: ActionFrequency) => {
-    // CRITICAL: Validate action before proceeding
-    if (!isPlayerTurn) {
-      return; // Don't allow actions when not player's turn
-    }
-    
-    // Get current state for validation
-    const state = useGameStore.getState();
-    const playerCurrentBet = state.playerBetsBB?.[state.playerSeat] || 0;
-    
-    // Validate action
-    const validation = validateAction(
-      frequency.action as Action | BettingAction,
+    const isPreflop = gameStage === "preflop";
+    const playerCurrentBet = playerBetsBB?.[playerSeat] || 0;
+    const availableActions = getAvailableActions(
       gameStage,
       actionToFace,
       currentBet,
       playerCurrentBet,
-      playerStackBB || 100,
-      bigBlind,
-      frequency.betSize
+      isPreflop
     );
-    
-    if (!validation.isValid) {
-      console.warn("Invalid action:", validation.error);
-      return; // Don't proceed with invalid action
+
+    const canCheck = availableActions.includes("check");
+    const canCall = availableActions.includes("call");
+    const canFold = availableActions.includes("fold");
+    const canBet = availableActions.includes("bet");
+    const canRaise = availableActions.includes("raise");
+    const toCall = Math.max(0, currentBet - playerCurrentBet);
+    const remainingStack = Math.max(0, (playerStackBB || 0) - playerCurrentBet);
+    const maxButtons = 6;
+    const minButtons = 5;
+    const boardTexture = analyzeBoardTexture(communityCards, playerHand, null);
+    const stackToPot = pot > 0 ? remainingStack / pot : 0;
+
+    const actionFrequencies = optimalActions.length > 0
+      ? getRealisticFrequencies(
+          playerHand,
+          playerPosition,
+          gameStage,
+          pot,
+          currentBet,
+          actionToFace,
+          optimalActions as Action[],
+          numPlayers,
+          playerStackBB
+        )
+      : [];
+
+    const frequencyMap = new Map<string, number>();
+    actionFrequencies.forEach(freq => {
+      const key = `${freq.action}-${freq.betSize ?? "none"}`;
+      frequencyMap.set(key, freq.frequency || 0);
+    });
+
+    const primaryButtons: ActionButton[] = [];
+
+    const foldValidation = validateAction(
+      "fold",
+      gameStage,
+      actionToFace,
+      currentBet,
+      playerCurrentBet,
+      remainingStack,
+      bigBlind,
+      undefined,
+      lastRaiseIncrement
+    );
+    primaryButtons.push({
+      id: "fold",
+      action: "fold",
+      label: "Fold",
+      frequency: frequencyMap.get("fold-none") || 0,
+      enabled: canFold && foldValidation.isValid,
+    });
+
+    if (toCall > 0) {
+      const callValidation = validateAction(
+        "call",
+        gameStage,
+        actionToFace,
+        currentBet,
+        playerCurrentBet,
+        remainingStack,
+        bigBlind,
+        undefined,
+        lastRaiseIncrement
+      );
+      primaryButtons.push({
+        id: "call",
+        action: "call",
+        label: `Call (${formatBB(toCall)} BB)`,
+        frequency: frequencyMap.get("call-none") || 0,
+        enabled: canCall && callValidation.isValid,
+      });
+    } else {
+      const checkValidation = validateAction(
+        "check",
+        gameStage,
+        actionToFace,
+        currentBet,
+        playerCurrentBet,
+        remainingStack,
+        bigBlind,
+        undefined,
+        lastRaiseIncrement
+      );
+      primaryButtons.push({
+        id: "check",
+        action: "check",
+        label: "Check",
+        frequency: frequencyMap.get("check-none") || 0,
+        enabled: canCheck && checkValidation.isValid,
+      });
     }
-    
-    setSelectedAction({ action: frequency.action, betSize: frequency.betSize });
-    
-    if (frequency.action === "fold" || frequency.action === "check" || frequency.action === "call") {
-      // Direct actions - no bet sizing needed
-      selectAction(frequency.action);
-    } else if (frequency.action === "bet" || frequency.action === "raise") {
-      // Bet/raise actions - if betSize is provided, use it directly (like fold/call)
-      // Otherwise, open bet sizing modal
-      if (frequency.betSize && frequency.betSize > 0) {
-        // Use solver-provided bet size directly
-        // Set pendingAction first without opening modal, then confirm bet size
-        useGameStore.setState({ 
-          pendingAction: frequency.action as Action,
-          showBetSizingModal: false // Ensure modal is closed
-        });
-        // Now confirmBetSize will work because pendingAction is set
-        confirmBetSize(frequency.betSize);
+
+    const sizeAction: "bet" | "raise" = gameStage === "preflop" ? "raise" : (toCall > 0 ? "raise" : "bet");
+    const sizeActionAllowed = sizeAction === "bet" ? canBet : canRaise;
+    let sizeButtons: ActionButton[] = [];
+
+    if (sizeActionAllowed) {
+      const solverSizes = actionFrequencies
+        .filter(freq => freq.action === sizeAction && (freq.frequency || 0) > 0)
+        .map(freq => freq.betSize)
+        .filter((size): size is number => typeof size === "number" && size > 0);
+
+      const maxSizeButtons = Math.max(0, maxButtons - primaryButtons.length);
+      const desiredTotal = Math.min(maxButtons, Math.max(minButtons, primaryButtons.length));
+      const desiredSizeCount = Math.max(0, desiredTotal - primaryButtons.length);
+
+      const candidatePercents: number[] = [];
+      if (boardTexture.wetness === "dry") {
+        candidatePercents.push(0.75, 1.0, 1.25);
+      } else if (boardTexture.wetness === "very-wet") {
+        candidatePercents.push(0.25, 0.33, 0.5, 0.75);
       } else {
-        // No bet size provided - open modal for user input
-        selectAction(frequency.action);
+        candidatePercents.push(0.33, 0.5, 0.66, 0.75);
+      }
+
+      if (stackToPot > 0 && stackToPot < 1.1) {
+        candidatePercents.unshift(0.75, 1.0);
+      }
+      if (stackToPot > 2) {
+        candidatePercents.push(1.25, 1.5);
+      }
+
+      const contextualSizes = isPreflop
+        ? [2, 2.5, 3, 4, 5].map(mult => Math.round(bigBlind * mult * 10) / 10)
+        : candidatePercents.map(pct => Math.round(pot * pct * 10) / 10);
+
+      const sizePool = Array.from(new Set([...solverSizes, ...contextualSizes])).filter(size => size > 0);
+
+      const sizedButtons = sizePool.map(size => {
+        const label = buildSizeLabel(sizeAction, pot, size);
+        const frequency = frequencyMap.get(`${sizeAction}-${size}`) || 0;
+        const validation = validateAction(
+          sizeAction,
+          gameStage,
+          actionToFace,
+          currentBet,
+          playerCurrentBet,
+          remainingStack,
+          bigBlind,
+          size,
+          lastRaiseIncrement
+        );
+
+        return {
+          id: `${sizeAction}-${size}`,
+          action: sizeAction,
+          betSize: size,
+          label,
+          frequency,
+          enabled: validation.isValid,
+        };
+      }).filter(button => button.enabled);
+
+      const solverFirst = solverSizes.length > 0
+        ? sizedButtons
+            .sort((a, b) => (b.frequency || 0) - (a.frequency || 0))
+        : sizedButtons.sort((a, b) => (a.betSize || 0) - (b.betSize || 0));
+
+      sizeButtons = solverFirst.slice(0, Math.min(maxSizeButtons, Math.max(desiredSizeCount, 0)));
+    }
+
+    const allInSize = remainingStack + playerCurrentBet;
+    if (allInSize > 0) {
+      const allInId = `allin-${allInSize}`;
+      if (!sizeButtons.some(button => button.betSize === allInSize)) {
+        const maxSizeButtons = Math.max(0, maxButtons - primaryButtons.length);
+        const allowAllIn = stackToPot <= 1.2 || sizeButtons.length < maxSizeButtons;
+        if (allowAllIn) {
+          if (sizeButtons.length >= maxSizeButtons) {
+            sizeButtons = sizeButtons.slice(0, maxSizeButtons - 1);
+          }
+          const validation = validateAction(
+            sizeAction,
+            gameStage,
+            actionToFace,
+            currentBet,
+            playerCurrentBet,
+            remainingStack,
+            bigBlind,
+            allInSize,
+            lastRaiseIncrement
+          );
+          sizeButtons.push({
+            id: allInId,
+            action: sizeAction,
+            betSize: allInSize,
+            label: `All-in (${formatBB(allInSize)} BB)`,
+            frequency: 0,
+            enabled: sizeActionAllowed && validation.isValid,
+            isAllIn: true,
+          });
+        }
       }
     }
-  };
 
-  const getActionButtonClass = (frequency: ActionFrequency, isSelected: boolean, isCorrect: boolean | null) => {
-    // Fixed min-height to ensure consistent button sizes even when frequencies appear
-    const baseClass = "relative py-4 px-4 text-base font-semibold rounded-lg transition-all duration-[220ms] border-2 w-full min-h-[80px] flex flex-col items-center justify-center ";
-    
-    // Morphing animation classes
-    const morphClass = animationPhase === "morphing" ? "scale-[1.02]" : animationPhase === "complete" ? "scale-100" : "scale-100";
-    
-    // Check if this is the highest frequency action (for highlighting)
-    const isHighestFrequency = shouldShowFrequencies && 
-                               highestFrequencyAction &&
-                               frequency.action === highestFrequencyAction.action &&
-                               frequency.betSize === highestFrequencyAction.betSize;
-    
-    // Highlight highest frequency action with subtle border glow (only if not selected)
-    const highestFreqHighlight = isHighestFrequency && !isSelected ? " ring-2 ring-yellow-400/50 ring-offset-1" : "";
-    
-    if (frequency.action === "fold") {
-      return baseClass + morphClass + highestFreqHighlight + (isSelected
-        ? (isCorrect ? " bg-gray-600 border-green-500 shadow-lg shadow-green-500/50" : " bg-gray-600 border-red-500 shadow-lg shadow-red-500/50")
-        : " bg-gray-700 hover:bg-gray-600 border-gray-500");
-    } else if (frequency.action === "check") {
-      return baseClass + morphClass + highestFreqHighlight + (isSelected
-        ? (isCorrect ? " bg-green-600 border-green-500 shadow-lg shadow-green-500/50" : " bg-green-600 border-red-500 shadow-lg shadow-red-500/50")
-        : " bg-green-600 hover:bg-green-700 border-green-700");
-    } else if (frequency.action === "call") {
-      return baseClass + morphClass + highestFreqHighlight + (isSelected
-        ? (isCorrect ? " bg-green-600 border-green-500 shadow-lg shadow-green-500/50" : " bg-green-600 border-red-500 shadow-lg shadow-red-500/50")
-        : " bg-green-600 hover:bg-green-700 border-green-700");
-    } else if (frequency.action === "bet" || frequency.action === "raise") {
-      // All bet/raise buttons are red with hover effect similar to fold/check
-      return baseClass + morphClass + highestFreqHighlight + (isSelected
-        ? (isCorrect ? " bg-red-600 border-green-500 shadow-lg shadow-green-500/50" : " bg-red-600 border-red-500 shadow-lg shadow-red-500/50")
-        : " bg-red-600 hover:bg-red-700 border-red-700");
+    const orderedSizeButtons = sizeButtons.sort((a, b) => {
+      if (a.isAllIn && !b.isAllIn) return 1;
+      if (b.isAllIn && !a.isAllIn) return -1;
+      return (a.betSize || 0) - (b.betSize || 0);
+    });
+
+    let allButtons = [...primaryButtons, ...orderedSizeButtons].slice(0, maxButtons);
+
+    if (allButtons.length < minButtons && sizeActionAllowed) {
+      const remainingSlots = Math.min(maxButtons, minButtons) - allButtons.length;
+      const fallbackPool = orderedSizeButtons.filter(btn => !allButtons.some(existing => existing.id === btn.id));
+      allButtons = [...allButtons, ...fallbackPool.slice(0, remainingSlots)];
     }
-    return baseClass + morphClass + highestFreqHighlight + " bg-gray-700 border-gray-600";
+    const highestFrequency = Math.max(0, ...allButtons.map(button => button.frequency || 0));
+    const highestFrequencyId = highestFrequency > 0
+      ? allButtons.find(button => button.frequency === highestFrequency)?.id || null
+      : null;
+
+    return { buttons: allButtons, highestFrequencyId };
+  }, [
+    playerHand,
+    gameStage,
+    actionToFace,
+    currentBet,
+    pot,
+    bigBlind,
+    playerStackBB,
+    playerPosition,
+    numPlayers,
+    optimalActions,
+    playerBetsBB,
+    playerSeat,
+    lastRaiseIncrement,
+  ]);
+
+  useEffect(() => {
+    if (!lastAction) return;
+    const selected = buttons.find(btn => {
+      if (btn.action !== lastAction) return false;
+      if (!btn.betSize || !betSizeBB) return true;
+      return Math.abs(btn.betSize - betSizeBB) < 0.01;
+    });
+    if (selected) {
+      setSelectedId(selected.id);
+      setIsConfirming(true);
+      const timer = setTimeout(() => setIsConfirming(false), 400);
+      return () => clearTimeout(timer);
+    }
+  }, [lastAction, betSizeBB, buttons]);
+
+  useEffect(() => {
+    if (isPlayerTurn) {
+      setSelectedId(null);
+      setIsConfirming(false);
+    }
+  }, [isPlayerTurn]);
+
+  const shouldRenderButtons = !!playerHand && buttons.length > 0;
+
+  const handleActionClick = (button: ActionButton) => {
+    if (!isPlayerTurn || !button.enabled) return;
+    setSelectedId(button.id);
+
+    if (button.action === "fold" || button.action === "check" || button.action === "call") {
+      selectAction(button.action);
+      return;
+    }
+
+    if (button.betSize && button.betSize > 0) {
+      useGameStore.setState({
+        pendingAction: button.action as Action,
+        showBetSizingModal: false,
+      });
+      confirmBetSize(button.betSize);
+    }
   };
-
-  // Separate buttons into groups
-  const foldCallButtons = availableFrequencies.filter(f => f.action === "fold" || f.action === "call" || f.action === "check");
-  const raiseBetButtons = availableFrequencies.filter(f => f.action === "bet" || f.action === "raise");
-  
-  // Sort raise/bet buttons by size
-  const sortedRaiseBetButtons = [...raiseBetButtons].sort((a, b) => {
-    const aSize = a.betSize || 0;
-    const bSize = b.betSize || 0;
-    if (a.label.includes("ALL-IN") && !b.label.includes("ALL-IN")) return 1;
-    if (b.label.includes("ALL-IN") && !a.label.includes("ALL-IN")) return -1;
-    return aSize - bSize;
-  });
-
-  // Show frequencies after user makes a choice
-  const shouldShowFrequencies = isCorrect !== null && lastAction !== null && optimalActions.length > 0;
-
-  // Find highest frequency action for highlighting
-  const highestFrequency = shouldShowFrequencies && availableFrequencies.length > 0
-    ? Math.max(...availableFrequencies.map(f => f.frequency || 0))
-    : 0;
-  
-  const highestFrequencyAction = shouldShowFrequencies && highestFrequency > 0
-    ? availableFrequencies.find(f => (f.frequency || 0) === highestFrequency)
-    : null;
-
-  // Calculate correctness level
-  const correctnessLevel = getCorrectnessLevel(isCorrect, Math.abs(evLoss || 0));
-  const correctnessLabel = getCorrectnessLabel(correctnessLevel);
-  const correctnessColor = getCorrectnessColor(correctnessLevel);
-
-  const renderButton = (freq: ActionFrequency, idx: number) => {
-    const isSelected = selectedAction?.action === freq.action && 
-                     selectedAction?.betSize === freq.betSize &&
-                     lastAction === freq.action &&
-                     (freq.betSize ? betSizeBB === freq.betSize : true) &&
-                     isCorrect !== null;
-    
-    // Show frequency on all buttons after player acts (including 0%)
-    const showFrequency = shouldShowFrequencies;
-    
-    // Check if this is the highest frequency action
-    const isHighestFrequency = shouldShowFrequencies && 
-                               highestFrequencyAction &&
-                               freq.action === highestFrequencyAction.action &&
-                               freq.betSize === highestFrequencyAction.betSize;
-    
-    return (
-      <div key={`action-${idx}`} className="relative">
-        {/* Correctness Label - slides up above selected button */}
-        {isSelected && correctnessLabel && showFeedback && (
-          <div 
-            className={`absolute -top-10 left-1/2 -translate-x-1/2 ${correctnessColor} text-sm font-bold whitespace-nowrap px-3 py-1 rounded-full bg-gray-900/90 backdrop-blur-sm border border-gray-700 transition-all duration-[150ms] ${
-              animationPhase === "complete" 
-                ? "opacity-100 translate-y-0" 
-                : "opacity-0 -translate-y-2"
-            }`}
-            style={{
-              transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)"
-            }}
-          >
-            {correctnessLabel}
-          </div>
-        )}
-        
-        <button
-          onClick={() => handleActionClick(freq)}
-          className={getActionButtonClass(freq, isSelected || false, isCorrect)}
-          disabled={buttonsDisabled || (showFeedback && !isSelected)}
-          style={{ 
-            transition: "all 220ms cubic-bezier(0.25, 0.1, 0.25, 1.0)",
-            opacity: (buttonsDisabled || (showFeedback && !isSelected)) ? 0.5 : 1,
-            cursor: (buttonsDisabled || (showFeedback && !isSelected)) ? "not-allowed" : "pointer"
-          }}
-          title={buttonsDisabled ? "Not your turn" : ""}
-        >
-          {/* Action Label - always visible, positioned at top */}
-          <span 
-            className={`font-semibold text-base transition-opacity duration-[100ms] block ${
-              isSelected && !isCorrect ? "text-white brightness-110" : ""
-            }`}
-            style={{
-              opacity: 1 // Always visible, even for incorrect choices
-            }}
-          >
-            {freq.label}
-          </span>
-          
-          {/* Frequency - shows on all buttons after player acts, positioned below action name */}
-          {/* Always render to reserve space and maintain consistent button size */}
-          <span 
-            className={`text-xs font-medium transition-opacity duration-[120ms] block mt-1 ${
-              isHighestFrequency ? "text-yellow-300 font-bold" : 
-              (freq.frequency || 0) > 0 ? "text-gray-300" : "text-gray-500"
-            }`}
-            style={{
-              opacity: showFrequency && animationPhase === "complete" ? 1 : 0,
-              transitionTimingFunction: "cubic-bezier(0.33, 0.0, 0.67, 1.0)",
-              minHeight: "1rem", // Reserve space for frequency text
-              visibility: showFrequency ? "visible" : "hidden" // Hide but reserve space when not showing
-            }}
-          >
-            {(freq.frequency || 0).toFixed(1)}%
-          </span>
-          
-          {/* Solver-best indicator for highest frequency - positioned below frequency */}
-          {/* Always render to reserve space and maintain consistent button size */}
-          <span 
-            className="text-[10px] font-bold text-yellow-300 transition-opacity duration-[120ms] block mt-0.5"
-            style={{
-              opacity: isHighestFrequency && showFrequency && animationPhase === "complete" ? 1 : 0,
-              transitionTimingFunction: "cubic-bezier(0.33, 0.0, 0.67, 1.0)",
-              minHeight: "0.75rem", // Reserve space for solver-best text
-              visibility: isHighestFrequency && showFrequency ? "visible" : "hidden" // Hide but reserve space when not showing
-            }}
-          >
-            (solver-best)
-          </span>
-          
-          {/* Correctness indicators */}
-          {isSelected && isCorrect && animationPhase === "complete" && (
-            <span className="absolute top-2 right-2 text-green-300 text-sm font-bold">✓</span>
-          )}
-          {isSelected && !isCorrect && animationPhase === "complete" && (
-            <span className="absolute top-2 right-2 text-red-300 text-sm font-bold">✗</span>
-          )}
-        </button>
-      </div>
-    );
-  };
-
-  if (availableFrequencies.length === 0) {
-    return null;
-  }
 
   return (
-    <div className="w-full space-y-3 relative z-10">
-      {/* Correct Frequencies Label - fades in after morph */}
-      {shouldShowFrequencies && (
-        <div 
-          className="flex items-center justify-center transition-all duration-[120ms]"
-          style={{
-            opacity: animationPhase === "complete" ? 1 : 0,
-            transform: animationPhase === "complete" ? "translateY(0)" : "translateY(-10px)",
-            transitionTimingFunction: "cubic-bezier(0.33, 0.0, 0.67, 1.0)"
-          }}
-        >
-          <div className="bg-teal-600/20 border border-teal-500 px-3 py-1 rounded text-teal-300 text-sm font-semibold">
-            CORRECT FREQUENCIES
-          </div>
-        </div>
-      )}
+    <div className="action-button-row">
+      <div className="grid grid-flow-col auto-cols-fr gap-2">
+        {shouldRenderButtons && buttons.map(button => {
+          const isHighlight = highestFrequencyId === button.id && button.frequency > 0;
+          const isSelected = selectedId === button.id;
+          const isDisabled = !isPlayerTurn || !button.enabled;
+          const why = getWhyBetContent(
+            playerHand,
+            communityCards,
+            gameStage,
+            button.action,
+            button.betSize,
+            pot,
+            opponentArchetype,
+            strategyMode === "exploit"
+          );
+          const tooltipTitle = button.betSize
+            ? `Why ${button.action === "raise" ? "Raise" : button.action.charAt(0).toUpperCase() + button.action.slice(1)} ${formatPercent(pot, button.betSize)}% (${formatBB(button.betSize)} BB)`
+            : why.title;
 
-      {/* Top Row: Fold and Call Buttons */}
-      {foldCallButtons.length > 0 && (
-        <div className="grid grid-cols-2 gap-2">
-          {foldCallButtons.map((freq, idx) => renderButton(freq, idx))}
-        </div>
-      )}
+          return (
+            <div key={button.id} className="relative">
+              <button
+                type="button"
+                onClick={() => handleActionClick(button)}
+                disabled={isDisabled}
+                className={`w-full min-h-[84px] rounded-lg border px-3 py-2 text-sm font-semibold transition-all duration-200 flex flex-col justify-between ${
+                  isDisabled
+                    ? "bg-gray-900/40 text-gray-500 border-gray-800 cursor-not-allowed"
+                    : button.action === "fold"
+                      ? "bg-[#6B6B6B] text-white border-[#6B6B6B] hover:brightness-110"
+                      : button.action === "check"
+                        ? "bg-[#00ADEF] text-white border-[#00ADEF] hover:brightness-110"
+                        : button.isAllIn
+                          ? "bg-[#B71C1C] text-white border-[#B71C1C] hover:brightness-110"
+                          : "bg-[#C72C48] text-white border-[#C72C48] hover:brightness-110"
+                } ${isHighlight ? "ring-2 ring-amber-400/50 border-amber-400/60" : ""} ${
+                  !isDisabled && selectedId && !isSelected ? "opacity-70" : ""
+                } ${
+                  isSelected ? "shadow-[0_0_18px_rgba(255,255,255,0.15)] brightness-110" : ""
+                } ${
+                  isSelected && isConfirming && button.isAllIn
+                    ? "scale-[1.03] shadow-[0_0_22px_rgba(183,28,28,0.6)]"
+                    : isSelected && isConfirming && (button.action === "bet" || button.action === "raise")
+                      ? "scale-[1.015] shadow-[0_0_18px_rgba(199,44,72,0.5)]"
+                      : ""
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-sm font-semibold">{button.label}</span>
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    className="text-gray-400 hover:text-gray-200"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setActiveTooltip(activeTooltip === button.id ? null : button.id);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        setActiveTooltip(activeTooltip === button.id ? null : button.id);
+                      }
+                    }}
+                    onMouseEnter={() => setActiveTooltip(button.id)}
+                    onMouseLeave={() => setActiveTooltip(null)}
+                    aria-label="Why this bet"
+                  >
+                    <Info className="h-4 w-4" />
+                  </span>
+                </div>
+                <div className="text-xs text-gray-500">
+                  {button.frequency > 0 ? `${button.frequency.toFixed(1)}%` : ""}
+                </div>
+              </button>
 
-      {/* Bottom Row: Raise/Bet Buttons */}
-      {sortedRaiseBetButtons.length > 0 && (
-        <div className="grid grid-cols-5 gap-2">
-          {sortedRaiseBetButtons.map((freq, idx) => renderButton(freq, foldCallButtons.length + idx))}
-        </div>
-      )}
-      
-      {/* Continue Button - appears after action */}
-      <ContinueButton />
+              {activeTooltip === button.id && (
+                <div className="absolute left-2 top-[90px] z-20 w-64 rounded-md border border-gray-700 bg-[#111111] p-3 text-xs text-gray-200 shadow-lg">
+                  <div className="text-sm font-semibold text-gray-100 mb-2">{tooltipTitle}</div>
+                  <div className="space-y-2">
+                    <div>
+                      <div className="text-[11px] uppercase text-gray-400 mb-1">Targets</div>
+                      {why.targets.map(item => (
+                        <div key={item}>- {item}</div>
+                      ))}
+                    </div>
+                    <div>
+                      <div className="text-[11px] uppercase text-gray-400 mb-1">Folds Out</div>
+                      {why.foldsOut.map(item => (
+                        <div key={item}>- {item}</div>
+                      ))}
+                    </div>
+                    <div>
+                      <div className="text-[11px] uppercase text-gray-400 mb-1">Continues</div>
+                      {why.continues.map(item => (
+                        <div key={item}>- {item}</div>
+                      ))}
+                    </div>
+                    {why.exploitNote.length > 0 && (
+                      <div>
+                        <div className="text-[11px] uppercase text-gray-400 mb-1">Exploit Note</div>
+                        {why.exploitNote.map(item => (
+                          <div key={item}>- {item}</div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

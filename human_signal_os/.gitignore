@@ -1,0 +1,15 @@
+# Next.js
+.next/
+out/
+
+# Node
+node_modules/
+
+# Env — never commit secrets
+.env
+.env.local
+.env.*.local
+
+# System
+.DS_Store
+*.pem

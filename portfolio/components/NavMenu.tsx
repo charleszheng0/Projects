@@ -27,7 +27,7 @@ export const NavMenu = memo(function NavMenu() {
       </nav>
 
       <a
-        href="https://drive.google.com/file/d/12zaALJ5TDh-Qe2tMreWwBEpwYaJ-KIrZ/view?usp=sharing"
+        href="https://drive.google.com/file/d/1xaHzalGX0S2G27hF2LSOLrs1AmIVcXUu/view?usp=sharing"
         target="_blank"
         rel="noopener noreferrer"
         className="text-[11px] tracking-[0.3em] text-muted transition-all hover:opacity-70 hover:line-through"

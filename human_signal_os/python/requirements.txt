@@ -1,0 +1,31 @@
+# Inflect — Speech Module Python dependencies
+# Install with:  pip install -r requirements.txt
+#
+# System prerequisites:
+#   brew install ffmpeg          (macOS — required by pydub and Whisper)
+#   brew install portaudio       (macOS — required by pyAudioAnalysis)
+
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+
+# Audio I/O
+soundfile>=0.12.0
+pydub>=0.25.1
+
+# Core audio analysis
+librosa>=0.10.1
+numpy>=1.24.0
+scipy>=1.11.0
+
+# Local Whisper (transcription only)
+openai-whisper>=20231117
+
+# pyAudioAnalysis (pre-trained emotion features)
+pyAudioAnalysis>=0.3.14
+hmmlearn>=0.2.8      # required by pyAudioAnalysis
+eyed3>=0.9.7         # required by pyAudioAnalysis for MP3 support
+matplotlib>=3.7.0    # required by pyAudioAnalysis
+
+# Optional — faster Whisper on Apple Silicon
+# mlx-whisper>=0.1.0

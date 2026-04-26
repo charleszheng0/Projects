@@ -22,12 +22,12 @@ export default function HomePage() {
           </MotionReveal>
           <MotionReveal delay={0.1}>
             <p className="max-w-xl text-lg text-ink">
-              Welcome to my portfolio! I'm an ECE/CS student @ Duke.<br />I work on stuff, and you'll see some of it here.
+              Welcome to my portfolio! I'm a CS student @ Duke.<br />You'll see the stuff I'm working on here.
             </p>
           </MotionReveal>
           <MotionReveal delay={0.2}>
             <p className="font-mono text-sm tracking-[0.3em] text-accent">
-              building w/ change
+              build with change
             </p>
           </MotionReveal>
         </div>
